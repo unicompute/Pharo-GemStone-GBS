@@ -11,12 +11,32 @@ Class {
 	#package : 'GemStone-GBS-Tools'
 }
 
-{ #category : 'as yet unclassified' }
+{ #category : 'accessing' }
+GbsRemoteDebugger >> exception: aGbsError [
+	exception := aGbsError.
+	"Only populate frames once we have the exception"
+	self populateFrames
+]
+
+{ #category : 'initialization' }
 GbsRemoteDebugger >> populateFrames [
-	"Extract the context from the GciError struct inside the exception"
-	| contextOop |
-	contextOop := exception tag context.
+	| errTag contextOop |
+	errTag := exception tag.
+	
+	"1. Bulletproof check: If the tag is missing or is just a string, show the message safely"
+	(errTag isNil or: [ errTag isString ]) ifTrue: [
+		listFrames items: { 'Remote Error: ', exception messageText }.
+		^ self
+	].
+	
+	"2. If it is a real GciError struct, extract the context OOP"
+	contextOop := errTag context.
 	listFrames items: { 'Remote Context (OOP: ', contextOop asString, ')' }.
+]
+
+{ #category : 'accessing' }
+GbsRemoteDebugger >> session: aSession [
+	session := aSession
 ]
 
 { #category : 'as yet unclassified' }

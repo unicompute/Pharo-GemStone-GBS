@@ -6,7 +6,8 @@ Class {
 		'sessionOop',
 		'parameters',
 		'pollingProcess',
-		'serverInterface'
+		'serverInterface',
+		'sessionId'
 	],
 	#category : 'GemStone-GBS-Converted',
 	#package : 'GemStone-GBS-Converted'
@@ -285,6 +286,28 @@ GbsSession >> fetchTranscriptLogs [
         inSession: sessionOop.
 ]
 
+{ #category : 'marshaling' }
+GbsSession >> forwardRemoteMessage: aMessage forOop: targetOop [
+	| script argStrings argsArrayString |
+	
+	"1. Handle messages with NO arguments (e.g., proxy size, proxy asString)"
+	aMessage arguments isEmpty ifTrue: [
+		script := '(Object _objectForOop: ', targetOop printString, ') perform: #', aMessage selector asString.
+		^ self evaluate: script
+	].
+	
+	"2. Handle messages WITH arguments"
+	argStrings := aMessage arguments collect: [ :each | self marshalArgumentToScript: each ].
+	
+	"Create a GemStone dynamic array syntax: { arg1 . arg2 }"
+	argsArrayString := '{ ', (' . ' join: argStrings), ' }'.
+	
+	"Execute the perform block remotely"
+	script := '(Object _objectForOop: ', targetOop printString, ') perform: #', aMessage selector asString, ' withArguments: ', argsArrayString.
+	
+	^ self evaluate: script
+]
+
 { #category : 'as yet unclassified' }
 GbsSession >> gciAbort [
   "GbsSession >> gciAbort"
@@ -370,6 +393,24 @@ GbsSession >> logout [
   self gciLogout = 1
     ifTrue: [ isLoggedIn := false ]
     ifFalse: [ GbsError signal: 'Failed to safely logout of GemStone.' ]
+]
+
+{ #category : 'marshaling' }
+GbsSession >> marshalArgumentToScript: anObject [
+  "Converts local Pharo objects into strings that represent them in GemStone syntax"
+
+  anObject isInteger ifTrue: [ ^ anObject asString ].
+  anObject == true ifTrue: [ ^ 'true' ].
+  anObject == false ifTrue: [ ^ 'false' ].
+  anObject ifNil: [ ^ 'nil' ].
+  anObject isString ifTrue: [ ^ '''' , ( anObject copyReplaceAll: '''' with: '''''' ) , '''' ].
+
+  "If the argument is another Proxy, look up its remote pointer!"
+  ( anObject isKindOf: GbsProxy ) ifTrue: [
+    ^ '(Object _objectForOop: ' , anObject oop asString , ')' ].
+
+  self error:
+    'Unsupported argument type for remote message send. Pass primitive types or GbsProxy objects.'
 ]
 
 { #category : 'accessing' }

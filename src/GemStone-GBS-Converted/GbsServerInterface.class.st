@@ -199,16 +199,18 @@ GbsServerInterface >> apiGciTsVersion [
 
 { #category : 'error handling' }
 GbsServerInterface >> checkError [
-    | errInfo result exOop |
-    errInfo := GciErrSType new.
-    result := self apiGciErr: errInfo getHandle.
-    result = 1 ifTrue: [ 
-        exOop := errInfo exceptionOop.
-        GbsError new 
-            messageText: ('GemStone Error: ', errInfo message);
-            gemStoneExceptionProxy: (GbsProxy oop: exOop session: GbsSessionParameters currentSession);
-            signal
-    ].
+	| errorStruct result |
+	errorStruct := GciError new.
+	
+	result := self apiGciErr: errorStruct.
+	
+	"Safely check if the FFI returned the integer 1, or the boolean true"
+	(result = 1 or: [ result == true ]) ifTrue: [
+		(GbsError new 
+			messageText: errorStruct message;
+			tag: errorStruct;
+			yourself) signal
+	].
 ]
 
 { #category : 'as yet unclassified' }

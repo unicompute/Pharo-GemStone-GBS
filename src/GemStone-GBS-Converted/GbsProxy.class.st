@@ -92,6 +92,40 @@ GbsProxy >> ifNil: aBlock [ ^ self
 GbsProxy >> ifNotNil: aBlock [ ^ aBlock cull: self
 ]
 
+{ #category : 'inspector' }
+GbsProxy >> inspectionRemoteState [
+
+  <inspectorPresentationOrder: 1 title: 'Remote State'>
+  | stateString dict lines |
+  "Ask GemStone to format the object's class name and instance variables into a key=value string"
+  stateString := self session evaluate: '
+		| obj strm vars |
+		obj := Object _objectForOop: ' , self oop printString , '.
+		strm := WriteStream on: String new.
+		strm nextPutAll: ''[Class]=''; nextPutAll: obj class name asString; nextPut: Character lf.
+		
+		vars := obj class allInstVarNames.
+		1 to: vars size do: [:i |
+			strm nextPutAll: (vars at: i) asString; nextPutAll: ''=''; nextPutAll: (obj instVarAt: i) printString; nextPut: Character lf.
+		].
+		strm contents
+	'.
+
+  "Parse the string back into Pharo associations"
+  lines := stateString lines.
+  dict := OrderedCollection new.
+  dict addAll: ( lines select: [ :line |
+          | parts |
+          parts := line splitOn: '='.
+          parts size = 2
+          ] ).
+  ^ SpTablePresenter new
+      addColumn: ( SpStringTableColumn title: 'Variable' evaluated: [ :assoc | assoc key ] );
+      addColumn: ( SpStringTableColumn title: 'Remote Value' evaluated: [ :assoc | assoc value ] );
+      items: dict;
+      yourself
+]
+
 { #category : 'printing' }
 GbsProxy >> inspectorClass [ ^ Smalltalk at: #StInspector ifAbsent: [ self class ]
 ]
