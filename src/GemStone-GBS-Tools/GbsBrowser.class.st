@@ -11,6 +11,58 @@ Class {
 	#package : 'GemStone-GBS-Tools'
 }
 
+{ #category : 'actions' }
+GbsBrowser >> compileMethod: sourceString [
+	| escapedSource script result |
+	
+	currentClassName ifNil: [ 
+		self inform: 'Please select a class first!'. 
+		^ self 
+	].
+	
+	"1. Escape single quotes in the Pharo source code so it can be safely injected into a String script"
+	escapedSource := sourceString copyReplaceAll: '''' with: ''''''.
+	
+	"2. Ask the remote GemStone class to compile the string"
+	script := '
+	| cls |
+	cls := Smalltalk at: #', currentClassName asString, '.
+	cls compileMethod: ''', escapedSource, ''' category: ''User-Defined''.
+	''Method compiled successfully!''
+	'.
+	
+	result := GbsSessionParameters currentSession evaluate: script.
+	
+	self inform: 'GemStone: ', result asString.
+	
+	"3. Refresh the method list so your newly saved method instantly appears in the UI!"
+	self loadMethodListFor: currentClassName.
+]
+
+{ #category : 'initialization' }
+GbsBrowser >> connectPresenters [
+	classList whenSelectionChangedDo: [ :selection |
+		selection selectedItem ifNotNil: [ :className |
+			currentClassName := className.
+			self loadMethodListFor: className.
+			self showClassDefinition: className.
+		]
+	].
+	
+	methodList whenSelectionChangedDo: [ :selection |
+		selection selectedItem ifNotNil: [ :selector |
+			currentClassName ifNotNil: [
+				self showMethodSource: selector class: currentClassName
+			]
+		]
+	].
+	
+	"--> Catch Cmd+S / Ctrl+S to save the code!! <--"
+	codeView whenSubmitDo: [ :text |
+		self compileMethod: text asString
+	].
+]
+
 { #category : 'layout' }
 GbsBrowser >> defaultLayout [
     ^ SpPanedLayout newVertical
