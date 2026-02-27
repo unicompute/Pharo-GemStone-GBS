@@ -11,6 +11,15 @@ Class {
 	#package : 'GemStone-GBS-Tools'
 }
 
+{ #category : 'layout' }
+GbsRemoteDebugger >> defaultLayout [
+	^ SpPanedLayout newVertical
+		positionOfSlider: 30 percent;
+		add: listFrames;
+		add: textSource;
+		yourself
+]
+
 { #category : 'accessing' }
 GbsRemoteDebugger >> exception: aGbsError [
 	exception := aGbsError.
@@ -19,19 +28,43 @@ GbsRemoteDebugger >> exception: aGbsError [
 ]
 
 { #category : 'initialization' }
+GbsRemoteDebugger >> initializePresenters [
+	listFrames := self newList.
+	listFrames headerTitle: 'Remote Execution Stack'.
+	
+	textSource := self newCode.
+	textSource text: '"Select a frame to see source code..."'.
+	textSource beNotEditable.
+]
+
+{ #category : 'layout' }
+GbsRemoteDebugger >> initializeWindow: aWindowPresenter [
+	aWindowPresenter
+		title: 'GemStone Remote Debugger';
+		initialExtent: 700@500.
+]
+
+{ #category : 'initialization' }
 GbsRemoteDebugger >> populateFrames [
-	| errTag contextOop |
-	errTag := exception tag.
-	
-	"1. Bulletproof check: If the tag is missing or is just a string, show the message safely"
-	(errTag isNil or: [ errTag isString ]) ifTrue: [
-		listFrames items: { 'Remote Error: ', exception messageText }.
-		^ self
-	].
-	
-	"2. If it is a real GciError struct, extract the context OOP"
-	contextOop := errTag context.
-	listFrames items: { 'Remote Context (OOP: ', contextOop asString, ')' }.
+
+  | errTag contextOop |
+  errTag := exception tag.
+
+  "1. Bulletproof check: If the tag is missing or is just a string"
+  ( errTag isNil or: [ errTag isString ] ) ifTrue: [
+      listFrames items: { ( 'Remote Error: ' , exception messageText ) }.
+      ^ self
+      ].
+
+  "2. Safely check if the struct actually understands #context"
+  ( errTag respondsTo: #context )
+    ifTrue: [ contextOop := errTag context asString ]
+    ifFalse: [ contextOop := 'Unavailable (Add #context to GciError struct)' ].
+
+  "3. Display both the error message and the context OOP"
+  listFrames items: {
+      ( 'Exception: ' , exception messageText ).
+      ( 'Remote Context OOP: ' , contextOop ) }
 ]
 
 { #category : 'accessing' }
