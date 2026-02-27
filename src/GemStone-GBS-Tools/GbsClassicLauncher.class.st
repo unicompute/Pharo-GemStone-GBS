@@ -57,6 +57,16 @@ GbsClassicLauncher >> buildMenuBar [
         ].
 ]
 
+{ #category : 'initialization' }
+GbsClassicLauncher >> connectPresenters [
+	"Ensure your commit and abort buttons fire the new logic"
+	btnCommit action: [ self doCommit ].
+	btnAbort action: [ self doAbort ].
+	
+	"Also keep any other button wirings you already had here for btnLoginLink, btnAdd, etc..."
+
+]
+
 { #category : 'layout' }
 GbsClassicLauncher >> defaultLayout [
     | topButtons bottomButtons topHalf bottomHalf |
@@ -108,10 +118,10 @@ GbsClassicLauncher >> defaultLayout [
 
 { #category : 'actions' }
 GbsClassicLauncher >> doAbort [
-    self withSelectedSession: [ :s | 
-        s abortTransaction. 
-        self inform: 'Transaction Aborted'. 
-    ].
+	self withSelectedSession: [ :session |
+		session abort.
+		self inform: 'GemStone: Transaction Aborted and Synced.'.
+	].
 ]
 
 { #category : 'actions' }
@@ -150,11 +160,11 @@ GbsClassicLauncher >> doBreak [
 
 { #category : 'actions' }
 GbsClassicLauncher >> doCommit [
-    self withSelectedSession: [ :s | 
-        s commitTransaction. 
-        self inform: 'Transaction Committed'. 
-        self refreshSessionList. 
-    ].
+	self withSelectedSession: [ :session |
+		session commitTransaction
+			ifTrue: [ self inform: 'GemStone: Commit Successful!' ]
+			ifFalse: [ self inform: 'GemStone: Commit Failed (Conflict)!' ]
+	].
 ]
 
 { #category : 'actions' }

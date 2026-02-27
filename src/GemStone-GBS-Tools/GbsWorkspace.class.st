@@ -3,7 +3,9 @@ Class {
 	#superclass : 'SpPresenter',
 	#instVars : [
 		'textEditor',
-		'btnExecute'
+		'btnExecute',
+		'btnCommit',
+		'btnAbort'
 	],
 	#category : 'GemStone-GBS-Tools',
 	#package : 'GemStone-GBS-Tools'
@@ -11,12 +13,33 @@ Class {
 
 { #category : 'layout' }
 GbsWorkspace >> defaultLayout [
+	^ SpBoxLayout newVertical
+		spacing: 5;
+		add: (SpBoxLayout newHorizontal
+			spacing: 5;
+			add: btnExecute;
+			add: btnCommit;
+			add: btnAbort;
+			yourself) height: 30;
+		add: textEditor;
+		yourself
+]
 
-  ^ SpBoxLayout newVertical
-      spacing: 5;
-      add: btnExecute height: 30;
-      add: textEditor;
-      yourself
+{ #category : 'actions' }
+GbsWorkspace >> doAbort [
+	GbsSessionParameters currentSession ifNotNil: [ :session |
+		session abort.
+		self inform: 'GemStone: Aborted and Synced to latest state.'
+	].
+]
+
+{ #category : 'actions' }
+GbsWorkspace >> doCommit [
+	GbsSessionParameters currentSession ifNotNil: [ :session |
+		session commitTransaction
+			ifTrue: [ self inform: 'GemStone: Commit Successful!' ]
+			ifFalse: [ self inform: 'GemStone: Commit Failed (Conflict)!' ]
+	]
 ]
 
 { #category : 'gemstone actions' }
@@ -138,25 +161,30 @@ GbsWorkspace >> initialize [
 
 { #category : 'initialization' }
 GbsWorkspace >> initializePresenters [
-
-  textEditor := self newCode.
-  textEditor syntaxHighlight: true.
-  textEditor beForObject: self.
-
-  "Set the context menu block"
-  textEditor contextMenu: [ self workspaceMenu ].
-
-  "Initialize Button"
-  btnExecute := self newButton
-                  label: 'Execute in GemStone (Cmd+G)';
-                  icon: ( self iconNamed: #glamorousPlay );
-                  action: [ self inspectIt ].
-
-  "Bind Keys"
-  textEditor bindKeyCombination: $d command toAction: [ self doIt ].
-  textEditor bindKeyCombination: $i command toAction: [ self inspectIt ].
-  textEditor bindKeyCombination: $p command toAction: [ self gemStonePrintIt ].
-  textEditor bindKeyCombination: $g command toAction: [ self inspectIt ]
+	"1. Setup Code Editor with all original features"
+	textEditor := self newCode.
+	textEditor syntaxHighlight: true.
+	textEditor beForObject: self.
+	textEditor contextMenu: [ self workspaceMenu ].
+	
+	"2. Bind Original Keyboard Shortcuts"
+	textEditor bindKeyCombination: $d command toAction: [ self doIt ].
+	textEditor bindKeyCombination: $i command toAction: [ self inspectIt ].
+	textEditor bindKeyCombination: $p command toAction: [ self gemStonePrintIt ].
+	textEditor bindKeyCombination: $g command toAction: [ self inspectIt ].
+	
+	"3. Setup the Original Execute Button"
+	btnExecute := self newButton
+		label: 'Execute in GemStone (Cmd+G)';
+		icon: ( self iconNamed: #glamorousPlay );
+		action: [ self inspectIt ].
+		
+	"4. Setup the New Transaction Buttons"
+	btnCommit := self newButton.
+	btnCommit label: 'Commit'; icon: (self iconNamed: #smallSave); action: [ self doCommit ].
+	
+	btnAbort := self newButton.
+	btnAbort label: 'Abort (Sync)'; icon: (self iconNamed: #smallCancel); action: [ self doAbort ].
 ]
 
 { #category : 'initialization' }

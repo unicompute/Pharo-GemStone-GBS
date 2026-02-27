@@ -8,6 +8,8 @@ Class {
 		'inputLibPath',
 		'btnLogin',
 		'btnLogout',
+		'btnCommit',
+		'btnAbort',
 		'btnWorkspace',
 		'btnBrowser',
 		'btnTranscript',
@@ -22,49 +24,50 @@ Class {
 
 { #category : 'initialization' }
 GbsLauncher >> connectPresenters [
-
-    btnLogin action: [ self doLogin ].
-    btnLogout action: [ self doLogout ].
-    
-    btnWorkspace action: [ GbsWorkspace new open ].
-    btnBrowser action: [ GbsBrowser new open ].
-    btnTranscript action: [ | t | t := GbsRemoteTranscript new. t open. t startPolling. ].
-    btnUsers action: [ GbsUserListPresenter new open ].
-
-    btnPolling action: [ self togglePollingPreference ].
+	btnLogin action: [ self doLogin ].
+	btnLogout action: [ self doLogout ].
+	
+	btnCommit action: [ self doCommit ].
+	btnAbort action: [ self doAbort ].
+	
+	btnWorkspace action: [ GbsWorkspace new open ].
+	btnBrowser action: [ GbsBrowser new open ].
+	btnTranscript action: [ | t | t := GbsRemoteTranscript new. t open. t startPolling. ].
+	btnUsers action: [ GbsUserListPresenter new open ].
+	btnPolling action: [ self togglePollingPreference ].
 ]
 
 { #category : 'layout' }
 GbsLauncher >> defaultLayout [
+	^ SpBoxLayout newVertical spacing: 5;
+		add: (SpGridLayout new beColumnNotHomogeneous;
+			add: 'Stone:' at: 1@1; add: inputStone at: 2@1;
+			add: 'User:' at: 1@2; add: inputUser at: 2@2;
+			add: 'Pass:' at: 1@3; add: inputPass at: 2@3;
+			add: 'Lib:' at: 1@4; add: inputLibPath at: 2@4; yourself) expand: false;
+		add: (SpBoxLayout newHorizontal spacing: 5; add: btnLogin; add: btnLogout; yourself) expand: false;
+		add: (SpBoxLayout newHorizontal spacing: 5; add: btnCommit; add: btnAbort; yourself) expand: false; "<-- Added Trans Buttons!"
+		add: (SpBoxLayout newVertical spacing: 5; add: btnWorkspace; add: btnBrowser; add: btnTranscript; add: btnUsers; yourself) expand: false;
+		add: btnPolling expand: false;
+		add: statusLabel expand: false;
+		yourself
+]
 
-  ^ SpBoxLayout newVertical
-      spacing: 5;
-      add: ( SpGridLayout new
-            add: 'Stone:' atPoint: 1 @ 1;
-            add: inputStone atPoint: 2 @ 1;
-            add: 'User:' atPoint: 1 @ 2;
-            add: inputUser atPoint: 2 @ 2;
-            add: 'Pass:' atPoint: 1 @ 3;
-            add: inputPass atPoint: 2 @ 3;
-            add: 'Lib:' atPoint: 1 @ 4;
-            add: inputLibPath atPoint: 2 @ 4 span: 3 @ 1;
-            yourself )
-      height: 130;
-      add: ( SpBoxLayout newHorizontal
-            add: btnLogin;
-            add: btnLogout;
-            yourself )
-      height: 30;
-      add: ( SpBoxLayout newVertical
-            add: 'Tools' asPresenter;
-            add: btnWorkspace;
-            add: btnBrowser;
-            add: btnTranscript;
-				add: btnUsers;
-            add: btnPolling;
-            yourself );
-      add: statusLabel;
-      yourself
+{ #category : 'actions' }
+GbsLauncher >> doAbort [
+	| activeSession |
+	activeSession := GbsSessionParameters allSessions detect: [ :each | each name = 'Simple Launcher Session' ] ifNone: [ ^ self ].
+	activeSession abort.
+	self inform: 'GemStone: Global Transaction Aborted.'.
+]
+
+{ #category : 'actions' }
+GbsLauncher >> doCommit [
+	| activeSession |
+	activeSession := GbsSessionParameters allSessions detect: [ :each | each name = 'Simple Launcher Session' ] ifNone: [ ^ self ].
+	activeSession commitTransaction
+		ifTrue: [ self inform: 'GemStone: Global Commit Successful!' ]
+		ifFalse: [ self inform: 'GemStone: Global Commit Failed (Conflict)!' ].
 ]
 
 { #category : 'actions' }
@@ -124,46 +127,27 @@ GbsLauncher >> doLogout [
 
 { #category : 'initialization' }
 GbsLauncher >> initializePresenters [
+	"Keep your existing input fields..."
+	inputStone := self newTextInput text: 'gs64stone'.
+	inputUser := self newTextInput text: 'DataCurator'.
+	inputPass := self newTextInput text: 'swordfish'; bePassword.
+	inputLibPath := self newTextInput text: '/opt/gemstone/product/lib/libgcilnk64.so'.
 
-  inputStone := self newTextInput.
-  inputStone text: 'gs64stone'.
-  
-  inputUser := self newTextInput.
-  inputUser text: 'DataCurator'.
-  
-  inputPass := self newTextInput.
-  inputPass text: 'swordfish'.
-  inputPass bePassword.
-  
-    inputLibPath := self newTextInput 
-        text: '/Users/tariq/GemStone64Bit3.7.4.3-arm64.Darwin/lib/libgcirpc-3.7.4.3-64.dylib';
-        placeholder: 'Path to libgcirpc.dylib'.
+	btnLogin := self newButton label: 'Login'; icon: (self iconNamed: #smallOk).
+	btnLogout := self newButton label: 'Logout'; icon: (self iconNamed: #smallCancel).
+	
+	btnCommit := self newButton label: 'Commit'; icon: (self iconNamed: #smallSave).
+	btnAbort := self newButton label: 'Abort'; icon: (self iconNamed: #smallCancel).
 
-  btnLogin := self newButton.
-  btnLogin label: 'Login'; icon: (self iconNamed: #smallOk).
-  
-  btnLogout := self newButton.
-  btnLogout label: 'Logout'; icon: (self iconNamed: #smallCancel).
+	btnWorkspace := self newButton label: 'Workspace'; icon: (self iconNamed: #smallWindow).
+	btnBrowser := self newButton label: 'Browser'; icon: (self iconNamed: #smallSystemBrowser).
+	btnTranscript := self newButton label: 'Transcript'; icon: (self iconNamed: #transcript).
+	btnUsers := self newButton label: 'Users'; icon: (self iconNamed: #user).
 
-  btnWorkspace := self newButton.
-  btnWorkspace label: 'Workspace'; icon: (self iconNamed: #smallWindow).
-  
-  btnBrowser := self newButton.
-  btnBrowser label: 'Browser'; icon: (self iconNamed: #smallSystemBrowser).
-  
-  btnTranscript := self newButton.
-  btnTranscript label: 'Transcript'; icon: (self iconNamed: #transcript).
-  
-  btnUsers := self newButton.
-  btnUsers label: 'Users'; icon: (self iconNamed: #user).
+	btnPolling := self newButton label: 'Toggle Polling'.
+	statusLabel := self newLabel label: 'Status: Disconnected'.
 
-  btnPolling := self newButton.
-  btnPolling label: 'Toggle Polling'.
-
-  statusLabel := self newLabel.
-  statusLabel label: 'Status: Disconnected'.
-
-  self updateUIState
+	self updateUIState.
 ]
 
 { #category : 'initialization' }
