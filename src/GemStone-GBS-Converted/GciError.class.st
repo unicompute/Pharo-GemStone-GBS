@@ -45,6 +45,12 @@ GciError class >> initialize [
 ]
 
 { #category : 'accessing' }
+GciError >> context [
+	"Manually read the second uint64 field (starts at byte 9) to bypass FFI compiler crashes!"
+	^ handle unsignedLongLongAt: 9.
+]
+
+{ #category : 'accessing' }
 GciError >> message [
 	"Reads from memory starting at byte 41 until a null terminator"
 	| stream val |
