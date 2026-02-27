@@ -14,7 +14,7 @@ Class {
 { #category : 'layout' }
 GbsRemoteDebugger >> defaultLayout [
 	^ SpPanedLayout newVertical
-		positionOfSlider: 30 percent;
+		positionOfSlider: 0.3; "<-- Use a raw Float to bypass the broken math!"
 		add: listFrames;
 		add: textSource;
 		yourself
