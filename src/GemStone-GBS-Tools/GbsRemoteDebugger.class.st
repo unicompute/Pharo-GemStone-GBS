@@ -27,6 +27,31 @@ GbsRemoteDebugger >> exception: aGbsError [
 	self populateFrames
 ]
 
+{ #category : 'actions' }
+GbsRemoteDebugger >> fetchSourceForSelectedFrame [
+	| contextOop script sourceText |
+	
+	(exception isNil or: [ exception tag isNil ]) ifTrue: [ ^ self ].
+	(exception tag respondsTo: #context) ifFalse: [ ^ self ].
+	
+	contextOop := exception tag context.
+	contextOop ifNil: [ ^ self ].
+	
+	script := '
+	| ctx |
+	ctx := Object _objectForOop: ', contextOop asString, '.
+	(ctx class name == #GsProcess) 
+		ifTrue: [ ctx _report ] 
+		ifFalse: [ 
+			(ctx respondsTo: #sourceString) 
+				ifTrue: [ ctx sourceString ] 
+				ifFalse: [ ctx asString ]
+		]'.
+		
+	sourceText := session evaluate: script.
+	textSource text: sourceText asString.
+]
+
 { #category : 'initialization' }
 GbsRemoteDebugger >> initializePresenters [
 	listFrames := self newList.
