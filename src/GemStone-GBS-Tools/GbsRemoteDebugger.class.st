@@ -11,6 +11,13 @@ Class {
 	#package : 'GemStone-GBS-Tools'
 }
 
+{ #category : 'initialization' }
+GbsRemoteDebugger >> connectPresenters [
+
+  listFrames whenSelectionChangedDo: [ :selection |
+    selection selectedItem ifNotNil: [ :item | self fetchSourceForSelectedFrame ] ]
+]
+
 { #category : 'layout' }
 GbsRemoteDebugger >> defaultLayout [
 	^ SpPanedLayout newVertical
