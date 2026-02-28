@@ -49,16 +49,23 @@ GbsWorkspace >> doIt [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'No Session' ].
 	
-	"1. Execute the code"
-	activeSession evaluate: code asString.
-	
-	"2. Wait for the FFI bridge to settle before fetching logs"
+	"CRITICAL: Fork the process to keep the UI thread alive and prevent FFI crashes"
 	[ 
-		(Delay forMilliseconds: 100) wait.
-		UIManager default defer: [
-			GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
+		[ 
+			"1. Execute the code on a background thread"
+			activeSession evaluate: code asString.
+			
+			"2. Give the network a tiny moment to settle"
+			(Delay forMilliseconds: 50) wait.
+			
+			"3. Tell the Transcript to fetch the result"
+			UIManager default defer: [
+				GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
+			].
+		] on: Error do: [ :ex | 
+			UIManager default defer: [ self inform: 'GemStone Error: ', ex description ].
 		].
-	] fork. "Forking takes it off the UI thread so it doesn't freeze Pharo"
+	] fork.
 ]
 
 { #category : 'actions' }
