@@ -94,26 +94,18 @@ GbsWorkspace >> gemStoneDebugIt [
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| code script |
+	| code activeSession script result |
 	code := self selectedCodeOrAll. 
 	code ifEmpty: [ ^ self ].
 	
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
+	
 	script := '( ', code asString, ' ) printString'.
 	
-	"1. Jump to a background thread just to wait 50ms so the menu can close!"
-	[ 
-		(Delay forMilliseconds: 50) wait.
-		
-		"2. Safely jump BACK to the Main Thread to do the FFI network call!"
-		UIManager default defer: [ 
-			| activeSession result |
-			activeSession := GbsSessionParameters currentSession.
-			activeSession ifNotNil: [ 
-				result := activeSession evaluate: script.
-				self insertResult: result asString.
-			] ifNil: [ self inform: 'Not connected to GemStone!' ].
-		].
-	] fork.
+	"Run safely on the main thread"
+	result := activeSession evaluate: script.
+	self insertResult: result asString.
 ]
 
 { #category : 'initialization' }
@@ -327,100 +319,36 @@ GbsWorkspace >> textEditor [
 
 { #category : 'menus' }
 GbsWorkspace >> workspaceMenu [
+	| menu |
+	menu := self newMenu.
+	
+	"--- GEMSTONE ACTIONS ---"
+	menu addGroup: [ :group | 
+		group addItem: [ :item |
+			item name: 'GemStone Do it'; shortcut: $d command; icon: (self iconNamed: #smallDoIt);
+			"CRITICAL FIX: Defer the action so the menu closes first!"
+			action: [ UIManager default defer: [ self doIt ] ] ].
+			
+		group addItem: [ :item |
+			item name: 'GemStone Inspect it'; shortcut: $i command; icon: (self iconNamed: #smallInspectIt);
+			action: [ UIManager default defer: [ self inspectIt ] ] ].
+			
+		group addItem: [ :item |
+			item name: 'GemStone Print it'; shortcut: $p command; icon: (self iconNamed: #smallPrintIt);
+			"CRITICAL FIX: Defer the action so the menu closes first!"
+			action: [ UIManager default defer: [ self gemStonePrintIt ] ] ].
+			
+		group addItem: [ :item |
+			item name: 'GemStone Debug it'; icon: (self iconNamed: #smallDebug);
+			action: [ UIManager default defer: [ self gemStoneDebugIt ] ] ].
+	].
 
-  | menu |
-  menu := self newMenu.
-
-  "--- GEMSTONE ACTIONS ---"
-  menu addGroup: [ :group |
-      group addItem: [ :item |
-          item
-            name: 'GemStone Do it';
-            shortcut: $d command;
-            icon: ( self iconNamed: #smallDoIt );
-            action: [ self doIt ]
-          ].
-      group addItem: [ :item |
-          item
-            name: 'GemStone Inspect it';
-            shortcut: $i command;
-            icon: ( self iconNamed: #smallInspectIt );
-            action: [ self inspectIt ]
-          ].
-      group addItem: [ :item |
-          item
-            name: 'GemStone Print it';
-            shortcut: $p command;
-            icon: ( self iconNamed: #smallPrintIt );
-            action: [ self gemStonePrintIt ]
-          ].
-
-      "Debug It now calls the specific method"
-      group addItem: [ :item |
-          item
-            name: 'GemStone Debug it';
-            icon: ( self iconNamed: #smallDebug );
-            action: [ self gemStoneDebugIt ]
-          ]
-      ].
-
-  "--- EDITING ---"
-  menu addGroup: [ :group |
-      group addItem: [ :item |
-          item
-            name: 'Copy';
-            shortcut: $c command;
-            icon: ( self iconNamed: #smallCopy );
-            action: [ Clipboard clipboardText: self selectedText ]
-          ].
-      group addItem: [ :item |
-          item
-            name: 'Cut';
-            shortcut: $x command;
-            icon: ( self iconNamed: #smallCut );
-            action: [
-                Clipboard clipboardText: self selectedText.
-                self replaceSelectionWith: ''
-                ]
-          ].
-      group addItem: [ :item |
-          item
-            name: 'Paste';
-            shortcut: $v command;
-            icon: ( self iconNamed: #smallPaste );
-            action: [ self replaceSelectionWith: Clipboard clipboardText ]
-          ]
-      ].
-
-  "--- LOCAL ACTIONS ---"
-  menu addGroup: [ :group |
-      group addItem: [ :item |
-          item
-            name: 'Local Do it';
-            icon: ( self iconNamed: #smallDoIt );
-            action: [ self localDoIt ]
-          ].
-      group addItem: [ :item |
-          item
-            name: 'Local Inspect it';
-            icon: ( self iconNamed: #smallInspectIt );
-            action: [ self localInspectIt ]
-          ].
-      group addItem: [ :item |
-          item
-            name: 'Local Print it';
-            icon: ( self iconNamed: #smallPrintIt );
-            action: [ self localPrintIt ]
-          ].
-
-      "Debug It now calls the specific method"
-      group addItem: [ :item |
-          item
-            name: 'Local Debug it';
-            icon: ( self iconNamed: #smallDebug );
-            action: [ self localDebugIt ]
-          ]
-      ].
-
-  ^ menu
+	"--- LOCAL ACTIONS (These don't use FFI, so they don't need defer) ---"
+	menu addGroup: [ :group | 
+		group addItem: [ :item | item name: 'Local Do it'; icon: (self iconNamed: #smallDoIt); action: [ self localDoIt ] ].
+		group addItem: [ :item | item name: 'Local Inspect it'; icon: (self iconNamed: #smallInspectIt); action: [ self localInspectIt ] ].
+		group addItem: [ :item | item name: 'Local Print it'; icon: (self iconNamed: #smallPrintIt); action: [ self localPrintIt ] ].
+	].
+	
+	^ menu
 ]
