@@ -51,66 +51,14 @@ GbsWorkspace >> doIt [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	"Run in the background so GemStone can freely send Transcript outcalls back to Pharo's UI"
-	[
-		activeSession evaluate: text asString.
-	] fork.
-]
-
-{ #category : 'actions' }
-GbsWorkspace >> executeInGemStone [
-    | code result |
-    code := self selectedCodeOrAll.
-    code ifEmpty: [ ^ self ].
-
-    [ 
-        result := GbsSessionParameters currentSession evaluate: code.
-        result inspect.
-
-        "Log success to transcript"
-        GbsRemoteTranscript show: 'Successfully executed: ', code
-    ] on: Error do: [ :ex |
-        (ex isKindOf: GbsError)
-            ifTrue: [ ex defaultAction ]
-            ifFalse: [ 
-                (ex messageText includesSubstring: 'session ID is invalid')
-                    ifTrue: [ 
-                        GbsRemoteTranscript show: 'Error: GemStone Session expired.'.
-                        self inform: 'GemStone Session expired. Please run the Login script again.' ]
-                    ifFalse: [ 
-                        GbsRemoteTranscript show: 'Execution Error: ', ex messageText.
-                        ex pass ]
-            ]
-    ]
-]
-
-{ #category : 'actions' }
-GbsWorkspace >> gemStoneDebugIt [
-    | code |
-    code := self selectedCodeOrAll.
-    code ifEmpty: [ ^ self ].
-
-    [ 
-        GbsSessionParameters currentSession evaluate: code.
-        self inform: 'GemStone: Executed (No errors to debug)'.
-        GbsRemoteTranscript show: 'Debug It: Executed without errors.'
-    ] on: Error do: [ :ex |
-        "Check if it's a GemStone error or local error"
-        (ex isKindOf: GbsError)
-            ifTrue: [ 
-                "GemStone server error - let it propagate for debugging"
-                ex pass ]
-            ifFalse: [ 
-                "Local Pharo error"
-                GbsRemoteTranscript show: 'Debug It Error caught: ', ex messageText.
-                ex inspect.
-                self inform: 'Local Error caught. Inspecting exception...' ]
-    ]
+	"CRITICAL FIX: Execute strictly on the main thread. NO FORK!"
+	activeSession evaluate: text asString.
+	self inform: 'GemStone: Execution Complete'.
 ]
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| text activeSession script |
+	| text activeSession script result |
 	text := textEditor selectedText.
 	text isEmpty ifTrue: [ text := textEditor text ].
 	
@@ -119,15 +67,9 @@ GbsWorkspace >> gemStonePrintIt [
 	
 	script := '( ', text asString, ' ) printString'.
 	
-	[
-		| result |
-		result := activeSession evaluate: script.
-		
-		"Hop back to the UI thread ONLY to show the result"
-		UIManager default defer: [
-			self inform: 'Result: ', result asString.
-		].
-	] fork.
+	"CRITICAL FIX: Execute strictly on the main thread. NO FORK!"
+	result := activeSession evaluate: script.
+	self inform: 'Result: ', result asString.
 ]
 
 { #category : 'initialization' }
