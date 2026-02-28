@@ -42,30 +42,28 @@ GbsWorkspace >> doCommit [
 	]
 ]
 
-{ #category : 'actions' }
+{ #category : 'do-its' }
 GbsWorkspace >> doIt [
 	| code activeSession |
 	code := self selectedCodeOrAll.
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'No Session' ].
 	
-	"OFFLOAD FROM UI THREAD: Forking prevents the UI from deadlocking during the network call"
+	"Move execution to a background process to keep the UI thread responsive"
 	[ 
-		[ 
-			"1. Execute the code"
-			activeSession evaluate: code asString.
+		| result |
+		[
+			"1. Perform the heavy FFI call"
+			result := activeSession evaluate: code asString.
 			
-			"2. Wait for the bridge to idle"
-			(Delay forMilliseconds: 50) wait.
-			
-			"3. Tell the Transcript to fetch results SAFELY"
+			"2. Once the call is 100% finished, schedule the UI update"
 			UIManager default defer: [
 				GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
 			].
 		] on: Error do: [ :ex | 
 			UIManager default defer: [ self inform: 'GemStone Error: ', ex description ].
 		].
-	] fork.
+	] forkAt: Processor userBackgroundPriority.
 ]
 
 { #category : 'actions' }

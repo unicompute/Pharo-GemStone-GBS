@@ -105,9 +105,7 @@ GbsRemoteTranscript class >> installTransientProxy [
 { #category : 'logic' }
 GbsRemoteTranscript >> appendLog: aString [
 	UIManager default defer: [
-		| current |
-		current := textPresenter text ifNil: [ '' ].
-		textPresenter text: current asString, aString, String cr.
+		textPresenter text: (textPresenter text asString, aString, String cr).
 	].
 ]
 
@@ -129,7 +127,7 @@ GbsRemoteTranscript >> fetchNewEntries [
 	| activeSession logEntries safeScript |
 	activeSession := GbsSessionParameters currentSession.
 	
-	"Safety Guard: Don't poll if the session is currently tied up"
+	"CRITICAL: GBS is non-reentrant. If the session is busy, abort this poll immediately."
 	(activeSession isNil or: [ activeSession isBusy ]) ifTrue: [ ^ self ].
 	
 	safeScript := '
@@ -142,10 +140,11 @@ GbsRemoteTranscript >> fetchNewEntries [
 	
 	[
 		logEntries := activeSession evaluate: safeScript.
-		logEntries do: [ :each | self appendLog: each asString ].
+		logEntries ifNotNil: [ 
+			logEntries do: [ :each | self appendLog: each asString ] ].
 	] on: Error do: [ :ex | 
-		"Log to local terminal only to prevent UI recursive loops"
-		NonInteractiveTranscript stdout nextPutAll: 'Poll skipped: ', ex description; cr.
+		"Log to terminal instead of UI to avoid recursive error loops"
+		NonInteractiveTranscript stdout nextPutAll: 'GBS Poll Collision: ', ex description; cr.
 	].
 ]
 
