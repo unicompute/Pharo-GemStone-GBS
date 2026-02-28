@@ -57,6 +57,12 @@ GbsWorkspace >> doIt [
 ]
 
 { #category : 'actions' }
+GbsWorkspace >> executeInGemStone [
+	"Safely catch any old Cmd+G shortcuts and route them to the correct, main-thread method"
+	^ self doIt
+]
+
+{ #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
 	| text activeSession script result |
 	text := textEditor selectedText.
