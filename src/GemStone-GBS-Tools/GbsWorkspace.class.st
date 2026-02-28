@@ -44,20 +44,17 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-	| text activeSession |
+	| text |
 	text := textEditor selectedText.
 	text isEmpty ifTrue: [ text := textEditor text ].
 	
-	activeSession := GbsSessionParameters currentSession.
-	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
+	GbsSessionParameters currentSession ifNil: [ 
+		^ self inform: 'Not connected to GemStone!' 
+	].
 	
-	"1. Push the FFI network call to a background thread so the UI NEVER locks!"
-	[
-		activeSession evaluate: text asString.
-		
-		"2. Safely hop back to the UI thread to show the popup"
-		UIManager default defer: [ self inform: 'GemStone: Execution Complete' ].
-	] fork.
+	"Run securely on the Main Thread. NO FORK!"
+	GbsSessionParameters currentSession evaluate: text asString.
+	self inform: 'GemStone: Execution Complete'.
 ]
 
 { #category : 'actions' }
@@ -113,27 +110,21 @@ GbsWorkspace >> gemStoneDebugIt [
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| text activeSession script |
+	| text script result |
 	text := textEditor selectedText.
 	text isEmpty ifTrue: [ text := textEditor text ].
 	
-	activeSession := GbsSessionParameters currentSession.
-	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
+	GbsSessionParameters currentSession ifNil: [ 
+		^ self inform: 'Not connected to GemStone!' 
+	].
 	
 	script := '( ', text asString, ' ) printString'.
 	
-	"1. Push the FFI network call to a background thread"
-	[
-		| result proxyString currentText |
-		result := activeSession evaluate: script.
-		proxyString := result asString.
-		
-		"2. Safely hop back to the UI thread to update the text editor"
-		UIManager default defer: [
-			currentText := textEditor text asString.
-			textEditor text: currentText , ' "', proxyString, '" '.
-		].
-	] fork.
+	"Run securely on the Main Thread. NO FORK!"
+	result := GbsSessionParameters currentSession evaluate: script.
+	
+	"Safely display the result in a popup instead of modifying the live text editor"
+	self inform: 'Result: ', result asString.
 ]
 
 { #category : 'initialization' }
