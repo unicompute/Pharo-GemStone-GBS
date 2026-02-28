@@ -31,8 +31,8 @@ GbsLauncher >> connectPresenters [
 	btnWorkspace action: [ GbsWorkspace new open ].
 	btnBrowser action: [ GbsBrowser new open ].
 	
-	"SAFE FIX: Just open the window, no more polling!"
-	btnTranscript action: [ GbsRemoteTranscript new open ].
+	"NATIVE FIX: Open the built-in, crash-proof Pharo Transcript!"
+	btnTranscript action: [ Transcript open ].
 	
 	btnUsers action: [ GbsUserListPresenter new open ].
 	btnPolling action: [ self togglePollingPreference ].
