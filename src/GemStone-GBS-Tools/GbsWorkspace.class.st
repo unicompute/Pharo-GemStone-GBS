@@ -49,13 +49,16 @@ GbsWorkspace >> doIt [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'No Session' ].
 	
-	"1. Execute your code - No complex setup here!!"
+	"1. Execute the code"
 	activeSession evaluate: code asString.
 	
-	"2. Safely tell the Transcript window to fetch any logs"
-	UIManager default defer: [
-		GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
-	].
+	"2. Wait for the FFI bridge to settle before fetching logs"
+	[ 
+		(Delay forMilliseconds: 100) wait.
+		UIManager default defer: [
+			GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
+		].
+	] fork. "Forking takes it off the UI thread so it doesn't freeze Pharo"
 ]
 
 { #category : 'actions' }

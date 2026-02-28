@@ -104,11 +104,8 @@ GbsRemoteTranscript class >> installTransientProxy [
 
 { #category : 'logic' }
 GbsRemoteTranscript >> appendLog: aString [
-    "The core method to update the UI safely"
     UIManager default defer: [
-        | currentText |
-        currentText := textPresenter text ifNil: [ '' ].
-        textPresenter text: currentText asString, aString, String cr.
+        textPresenter text: (textPresenter text asString, aString).
     ].
 ]
 
@@ -127,28 +124,29 @@ GbsRemoteTranscript >> defaultLayout [
 
 { #category : 'actions' }
 GbsRemoteTranscript >> fetchNewEntries [
-    | activeSession logText safeScript |
-    activeSession := GbsSessionParameters currentSession.
-    activeSession ifNil: [ ^ self ].
-    
-    safeScript := '
-        | log copy |
-        log := SessionTemps current at: #RemoteLog ifAbsent: [ #() ].
-        copy := log copy.
-        log removeAll.
-        String streamContents: [ :s | 
-            copy do: [ :each | s nextPutAll: each asString; lf ] 
-        ]
-    '.
-    
-    [
-        logText := activeSession evaluate: safeScript.
-        logText ifNotEmpty: [ self appendLog: logText ].
-    ] on: Error do: [ :ex | 
-        "Ignore 'Session Busy' errors during polling, but log others to Pharo's local Transcript"
-        (ex description includesSubstring: 'busy') 
-            ifFalse: [ NonInteractiveTranscript stdout nextPutAll: 'GBS Poll Error: ', ex description; cr ].
-    ].
+	| activeSession logText safeScript |
+	activeSession := GbsSessionParameters currentSession.
+	
+	"If the session is currently executing something else, skip this poll"
+	(activeSession isNil or: [ activeSession isBusy ]) ifTrue: [ ^ self ].
+	
+	safeScript := '
+		| log copy |
+		log := SessionTemps current at: #RemoteLog ifAbsent: [ #() ].
+		copy := log copy.
+		log removeAll.
+		String streamContents: [ :s | 
+			copy do: [ :each | s nextPutAll: each asString; lf ] 
+		]
+	'.
+	
+	[
+		logText := activeSession evaluate: safeScript.
+		logText ifNotEmpty: [ self appendLog: logText ].
+	] on: Error do: [ :ex | 
+		"Log to terminal, don't pop up a window"
+		NonInteractiveTranscript stdout nextPutAll: 'GBS Poll Skip: ', ex description; cr.
+	].
 ]
 
 { #category : 'logging' }
