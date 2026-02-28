@@ -44,17 +44,20 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-	| text |
+	| text activeSession |
 	text := textEditor selectedText.
 	text isEmpty ifTrue: [ text := textEditor text ].
 	
-	GbsSessionParameters currentSession ifNil: [ 
-		^ self inform: 'Not connected to GemStone!' 
-	].
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	"Safely evaluate without returning or inspecting the proxy"
-	GbsSessionParameters currentSession evaluate: text asString.
-	self inform: 'GemStone: Execution Complete'.
+	"1. Push the FFI network call to a background thread so the UI NEVER locks!"
+	[
+		activeSession evaluate: text asString.
+		
+		"2. Safely hop back to the UI thread to show the popup"
+		UIManager default defer: [ self inform: 'GemStone: Execution Complete' ].
+	] fork.
 ]
 
 { #category : 'actions' }
@@ -110,21 +113,27 @@ GbsWorkspace >> gemStoneDebugIt [
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| text result proxyString currentText |
+	| text activeSession script |
 	text := textEditor selectedText.
 	text isEmpty ifTrue: [ text := textEditor text ].
 	
-	GbsSessionParameters currentSession ifNil: [ 
-		^ self inform: 'Not connected to GemStone!' 
-	].
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	"1. Ask GemStone to evaluate the code AND convert the result to a String on the server!"
-	result := GbsSessionParameters currentSession evaluate: '( ', text asString, ' ) printString'.
+	script := '( ', text asString, ' ) printString'.
 	
-	"2. Safely append the result to the bottom of the Workspace"
-	proxyString := result asString.
-	currentText := textEditor text asString.
-	textEditor text: currentText , ' "', proxyString, '" '.
+	"1. Push the FFI network call to a background thread"
+	[
+		| result proxyString currentText |
+		result := activeSession evaluate: script.
+		proxyString := result asString.
+		
+		"2. Safely hop back to the UI thread to update the text editor"
+		UIManager default defer: [
+			currentText := textEditor text asString.
+			textEditor text: currentText , ' "', proxyString, '" '.
+		].
+	] fork.
 ]
 
 { #category : 'initialization' }
