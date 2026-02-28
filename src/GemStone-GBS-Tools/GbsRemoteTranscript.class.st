@@ -43,3 +43,15 @@ GbsRemoteTranscript >> initializeWindow: aWindowPresenter [
 		title: 'GemStone Remote Transcript (VW Port)';
 		initialExtent: 600@400.
 ]
+
+{ #category : 'initialization' }
+GbsRemoteTranscript >> startPolling [
+	"Deprecated: The VW port uses push-updates instead of polling. Safely ignore."
+	^ self.
+]
+
+{ #category : 'initialization' }
+GbsRemoteTranscript >> stopPolling [
+	"Deprecated: Safely ignore."
+	^ self.
+]
