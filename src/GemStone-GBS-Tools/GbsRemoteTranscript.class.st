@@ -11,13 +11,14 @@ Class {
 
 { #category : 'setup' }
 GbsRemoteTranscript class >> installForwarder [
-	"Connect Pharo's system Transcript to our custom Spec2 window"
-	Transcript announcer 
-		when: StringSignal 
-		do: [ :signal | 
-			self allInstancesDo: [ :win | win appendLog: signal message ] 
-		]
-		for: self
+  "Connect Pharo's system Transcript to our custom Spec2 window"
+
+  "GbsRemoteTranscript installForwarder."
+
+  Transcript announcer
+    when: StringSignal
+    do: [ :signal | self allInstancesDo: [ :win | win appendLog: signal message ] ]
+    for: self
 ]
 
 { #category : 'gemstone integration' }
