@@ -86,18 +86,23 @@ GbsWorkspace >> gemStoneDebugIt [
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| text activeSession script result |
-	text := textEditor selectedText.
-	text isEmpty ifTrue: [ text := textEditor text ].
+	| code activeSession script result |
+	
+	"Use your existing helper to grab the text"
+	code := self selectedCodeOrAll. 
+	code ifEmpty: [ ^ self ].
 	
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	script := '( ', text asString, ' ) printString'.
+	"Wrap the code to ensure GemStone returns a String"
+	script := '( ', code asString, ' ) printString'.
 	
-	"CRITICAL FIX: Execute strictly on the main thread. NO FORK!"
+	"1. Execute safely on the main thread"
 	result := activeSession evaluate: script.
-	self inform: 'Result: ', result asString.
+	
+	"2. Insert the result directly into the Workspace text!"
+	self insertResult: result asString.
 ]
 
 { #category : 'initialization' }
