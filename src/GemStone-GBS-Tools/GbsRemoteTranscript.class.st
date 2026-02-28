@@ -55,6 +55,41 @@ GbsRemoteTranscript class >> installGemStoneProxy [
     do: [ :ex | aGbsRemoteTranscript inform: 'Installation failed: ' , ex description ]
 ]
 
+{ #category : 'gemstone integration' }
+GbsRemoteTranscript class >> installTransientProxy [
+	| session script |
+	session := GbsSessionParameters currentSession.
+	session ifNil: [ ^ self inform: 'Log in to GemStone first!' ].
+
+	"Use <quote> substitution to completely avoid FFI string-escaping crashes!"
+	script := '
+	| tempDict proxyClass |
+	tempDict := SymbolDictionary new name: #PharoSessionGlobals.
+	
+	proxyClass := Object subclass: <quote>PharoTranscriptProxy<quote>
+		instVarNames: #() classVars: #() classInstVars: #(<quote>currentLine<quote>)
+		poolDictionaries: #() inDictionary: tempDict options: #().
+		
+	proxyClass class compileMethod: <quote>show: aString
+		currentLine := (currentLine ifNil: [ <quote><quote> ]), aString asString.<quote> category: <quote>logging<quote>.
+		
+	proxyClass class compileMethod: <quote>cr
+		| log |
+		log := SessionTemps current at: #PharoTranscriptLog ifAbsentPut: [ OrderedCollection new ].
+		log add: (currentLine ifNil: [ <quote><quote> ]).
+		currentLine := <quote><quote>.<quote> category: <quote>logging<quote>.
+		
+	tempDict at: #Transcript put: proxyClass.
+	
+	"Inject dictionary at the front of the search path to shadow the real Transcript"
+	System myUserProfile insertDictionary: tempDict at: 1.
+	true
+	' copyReplaceAll: '<quote>' with: ''''.
+
+	session evaluate: script.
+	self inform: 'Remote Transcript Proxy Installed safely!'.
+]
+
 { #category : 'updating' }
 GbsRemoteTranscript >> appendLog: aString [
 	"Ported VW Pattern: Push the UI update onto the safe UIManager queue"

@@ -44,24 +44,37 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-	| code |
-	code := self selectedCodeOrAll.
-	code ifEmpty: [ ^ self ].
-	
-	"1. Jump to a background thread just to wait 50ms so the menu can close!"
-	[ 
-		(Delay forMilliseconds: 50) wait.
-		
-		"2. Safely jump BACK to the Main Thread to do the FFI network call!"
-		UIManager default defer: [ 
-			| activeSession |
-			activeSession := GbsSessionParameters currentSession.
-			activeSession ifNotNil: [ 
-				activeSession evaluate: code asString.
-				self inform: 'GemStone: Execution Complete'.
-			] ifNil: [ self inform: 'Not connected to GemStone!' ].
-		].
-	] fork.
+
+  | code activeSession |
+  code := self selectedCodeOrAll.
+  code ifEmpty: [ ^ self ].
+
+  activeSession := GbsSessionParameters currentSession.
+  activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
+
+  "Defer to prevent the Morphic Menu Deadlock!"
+  UIManager default defer: [
+      | fetchScript logs |
+      "1. Execute the user's code safely"
+      activeSession evaluate: code asString.
+
+      "2. Fetch the caught logs and clear the server's cache"
+      fetchScript := '
+			| log copy |
+			log := SessionTemps current at: #PharoTranscriptLog ifAbsent: [ OrderedCollection new ].
+			copy := log copy.
+			log removeAll.
+			copy asArray
+		'.
+      logs := activeSession evaluate: fetchScript.
+
+      "3. Push the logs directly into our custom VW-ported Remote Transcript window!"
+      ( logs isKindOf: Array ) ifTrue: [
+        logs do: [ :each |
+          GbsRemoteTranscript allInstancesDo: [ :win | win appendLog: each asString ] ] ].
+
+      self inform: 'GemStone: Execution Complete'
+      ]
 ]
 
 { #category : 'actions' }
