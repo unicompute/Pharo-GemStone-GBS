@@ -102,14 +102,14 @@ GbsRemoteTranscript class >> installTransientProxy [
 	self inform: 'Remote Transcript Proxy Installed safely!'.
 ]
 
-{ #category : 'updating' }
+{ #category : 'logic' }
 GbsRemoteTranscript >> appendLog: aString [
-	"Thread-safe update for Spec2"
-	UIManager default defer: [
-		| currentText |
-		currentText := textPresenter text asString.
-		textPresenter text: currentText, aString.
-	].
+    "The core method to update the UI safely"
+    UIManager default defer: [
+        | currentText |
+        currentText := textPresenter text ifNil: [ '' ].
+        textPresenter text: currentText asString, aString, String cr.
+    ].
 ]
 
 { #category : 'logging' }
@@ -123,6 +123,32 @@ GbsRemoteTranscript >> defaultLayout [
 		add: btnClear expand: false fill: false padding: 2;
 		add: textPresenter;
 		yourself
+]
+
+{ #category : 'actions' }
+GbsRemoteTranscript >> fetchNewEntries [
+    | activeSession logText safeScript |
+    activeSession := GbsSessionParameters currentSession.
+    activeSession ifNil: [ ^ self ].
+    
+    safeScript := '
+        | log copy |
+        log := SessionTemps current at: #RemoteLog ifAbsent: [ #() ].
+        copy := log copy.
+        log removeAll.
+        String streamContents: [ :s | 
+            copy do: [ :each | s nextPutAll: each asString; lf ] 
+        ]
+    '.
+    
+    [
+        logText := activeSession evaluate: safeScript.
+        logText ifNotEmpty: [ self appendLog: logText ].
+    ] on: Error do: [ :ex | 
+        "Ignore 'Session Busy' errors during polling, but log others to Pharo's local Transcript"
+        (ex description includesSubstring: 'busy') 
+            ifFalse: [ NonInteractiveTranscript stdout nextPutAll: 'GBS Poll Error: ', ex description; cr ].
+    ].
 ]
 
 { #category : 'logging' }

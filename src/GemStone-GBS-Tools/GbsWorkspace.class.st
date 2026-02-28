@@ -46,14 +46,15 @@ GbsWorkspace >> doCommit [
 GbsWorkspace >> doIt [
 	| code activeSession |
 	code := self selectedCodeOrAll.
-	code ifEmpty: [ ^ self ].
-	
 	activeSession := GbsSessionParameters currentSession.
-	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
+	activeSession ifNil: [ ^ self inform: 'No Session' ].
 	
-	UIManager default defer: [ 
-		activeSession evaluate: code asString.
-		self inform: 'GemStone: Execution Complete'.
+	"1. Execute your code - No complex setup here!!"
+	activeSession evaluate: code asString.
+	
+	"2. Safely tell the Transcript window to fetch any logs"
+	UIManager default defer: [
+		GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
 	].
 ]
 
