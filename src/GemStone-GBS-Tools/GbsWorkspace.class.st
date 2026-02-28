@@ -44,17 +44,17 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-	| text |
+	| text activeSession |
 	text := textEditor selectedText.
 	text isEmpty ifTrue: [ text := textEditor text ].
 	
-	GbsSessionParameters currentSession ifNil: [ 
-		^ self inform: 'Not connected to GemStone!' 
-	].
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	"Run securely on the Main Thread. NO FORK!"
-	GbsSessionParameters currentSession evaluate: text asString.
-	self inform: 'GemStone: Execution Complete'.
+	"Run in the background so GemStone can freely send Transcript outcalls back to Pharo's UI"
+	[
+		activeSession evaluate: text asString.
+	] fork.
 ]
 
 { #category : 'actions' }
@@ -110,21 +110,24 @@ GbsWorkspace >> gemStoneDebugIt [
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| text script result |
+	| text activeSession script |
 	text := textEditor selectedText.
 	text isEmpty ifTrue: [ text := textEditor text ].
 	
-	GbsSessionParameters currentSession ifNil: [ 
-		^ self inform: 'Not connected to GemStone!' 
-	].
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
 	script := '( ', text asString, ' ) printString'.
 	
-	"Run securely on the Main Thread. NO FORK!"
-	result := GbsSessionParameters currentSession evaluate: script.
-	
-	"Safely display the result in a popup instead of modifying the live text editor"
-	self inform: 'Result: ', result asString.
+	[
+		| result |
+		result := activeSession evaluate: script.
+		
+		"Hop back to the UI thread ONLY to show the result"
+		UIManager default defer: [
+			self inform: 'Result: ', result asString.
+		].
+	] fork.
 ]
 
 { #category : 'initialization' }
@@ -143,14 +146,14 @@ GbsWorkspace >> initialize [
 { #category : 'initialization' }
 GbsWorkspace >> initializePresenters [
 	textEditor := self newCode.
-	textEditor syntaxHighlight: true.
-	textEditor beForObject: self.
+	
+	"CRITICAL FIX: Removed syntaxHighlight and beForObject so pasting doesn't trigger FFI lookups!"
+	
 	textEditor contextMenu: [ self workspaceMenu ].
 	
 	textEditor bindKeyCombination: $d command toAction: [ self doIt ].
 	textEditor bindKeyCombination: $p command toAction: [ self gemStonePrintIt ].
 	
-	"CRITICAL FIX: Point this to doIt, NOT inspectIt!"
 	btnExecute := self newButton
 		label: 'Execute in GemStone (Cmd+G)';
 		icon: ( self iconNamed: #glamorousPlay );

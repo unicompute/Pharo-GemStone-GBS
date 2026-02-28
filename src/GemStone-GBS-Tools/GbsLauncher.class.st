@@ -208,14 +208,24 @@ GbsLauncher >> updateUIState [
 		statusLabel label: 'Status: Connected to ', activeSession gemStoneName.
 		btnLogin disable.
 		inputStone disable. inputUser disable. inputPass disable. inputLibPath disable.
-		btnLogout enable. btnCommit enable. btnAbort enable.
+		btnLogout enable. 
+		
+		"Defensive checks: Only enable if the button actually exists!"
+		btnCommit ifNotNil: [ btnCommit enable ]. 
+		btnAbort ifNotNil: [ btnAbort enable ].
+		
 		btnWorkspace enable. btnBrowser enable. btnTranscript enable.
 		btnUsers ifNotNil: [ btnUsers enable ].
 	] ifNil: [
 		statusLabel label: 'Status: Disconnected'.
 		btnLogin enable.
 		inputStone enable. inputUser enable. inputPass enable. inputLibPath enable.
-		btnLogout disable. btnCommit disable. btnAbort disable.
+		btnLogout disable. 
+		
+		"Defensive checks: Only disable if the button actually exists!"
+		btnCommit ifNotNil: [ btnCommit disable ]. 
+		btnAbort ifNotNil: [ btnAbort disable ].
+		
 		btnWorkspace disable. btnBrowser disable. btnTranscript disable.
 		btnUsers ifNotNil: [ btnUsers disable ].
 	].
