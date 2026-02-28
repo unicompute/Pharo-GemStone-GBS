@@ -42,29 +42,19 @@ GbsWorkspace >> doCommit [
 	]
 ]
 
-{ #category : 'gemstone actions' }
+{ #category : 'actions' }
 GbsWorkspace >> doIt [
-  "Execute code in GemStone session"
-
-  | code session |
-  code := self selectedCodeOrAll.
-  code ifEmpty: [ ^ self ].
-
-  session := GbsSessionParameters currentSession.
-  session ifNil: [ ^ self inform: 'No active GemStone session.' ].
-
-  [
-    session evaluate: '[ ' , code , ' ] value'.
-    self inform: 'GemStone DoIt: Executed'
-    ]
-    on: Error
-    do: [ :ex | "Check if it's a GemStone error or local Pharo error"
-        ( ex isKindOf: GbsError )
-          ifTrue: [ "Server-side error - open remote debugger"
-          self openRemoteDebuggerOn: ex session: session ]
-          ifFalse: [ "Local Pharo bug or FFI crash"
-          self inform: 'Local Pharo Error: ' , ex messageText ]
-        ]
+	| text |
+	text := textEditor selectedText.
+	text isEmpty ifTrue: [ text := textEditor text ].
+	
+	GbsSessionParameters currentSession ifNil: [ 
+		^ self inform: 'Not connected to GemStone!' 
+	].
+	
+	"Safely evaluate without returning or inspecting the proxy"
+	GbsSessionParameters currentSession evaluate: text asString.
+	self inform: 'GemStone: Execution Complete'.
 ]
 
 { #category : 'actions' }
@@ -118,32 +108,23 @@ GbsWorkspace >> gemStoneDebugIt [
     ]
 ]
 
-{ #category : 'gemstone actions' }
+{ #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-    | code rawResult stringResult text selectionEnd newText |
-    code := self selectedCodeOrAll.
-    code ifEmpty: [ ^ self ].
-
-    [ 
-        "Wrap code in a Block so semicolons and periods do not break the syntax"
-        "The server returns printString, which is already a String, so we can use asString"
-        rawResult := GbsSessionParameters currentSession evaluate: '[ ' , code , ' ] value printString'.
-
-        "Since we asked for printString on the server, result should be a String"
-        stringResult := rawResult asString.
-
-        text := textEditor text asString.
-        selectionEnd := textEditor selectionInterval last.
-
-        newText := ( text copyFrom: 1 to: selectionEnd ) , ' ' , stringResult
-            , ( text copyFrom: selectionEnd + 1 to: text size ).
-
-        textEditor text: newText
-    ] on: Error do: [ :ex |
-        (ex isKindOf: GbsError)
-            ifTrue: [ ex defaultAction ]
-            ifFalse: [ self inform: 'GemStone Error: ' , ex messageText ]
-    ]
+	| text result proxyString currentText |
+	text := textEditor selectedText.
+	text isEmpty ifTrue: [ text := textEditor text ].
+	
+	GbsSessionParameters currentSession ifNil: [ 
+		^ self inform: 'Not connected to GemStone!' 
+	].
+	
+	"1. Ask GemStone to evaluate the code AND convert the result to a String on the server!"
+	result := GbsSessionParameters currentSession evaluate: '( ', text asString, ' ) printString'.
+	
+	"2. Safely append the result to the bottom of the Workspace"
+	proxyString := result asString.
+	currentText := textEditor text asString.
+	textEditor text: currentText , ' "', proxyString, '" '.
 ]
 
 { #category : 'initialization' }
@@ -161,30 +142,22 @@ GbsWorkspace >> initialize [
 
 { #category : 'initialization' }
 GbsWorkspace >> initializePresenters [
-	"1. Setup Code Editor with all original features"
 	textEditor := self newCode.
 	textEditor syntaxHighlight: true.
 	textEditor beForObject: self.
 	textEditor contextMenu: [ self workspaceMenu ].
 	
-	"2. Bind Original Keyboard Shortcuts"
 	textEditor bindKeyCombination: $d command toAction: [ self doIt ].
-	textEditor bindKeyCombination: $i command toAction: [ self inspectIt ].
 	textEditor bindKeyCombination: $p command toAction: [ self gemStonePrintIt ].
-	textEditor bindKeyCombination: $g command toAction: [ self inspectIt ].
 	
-	"3. Setup the Original Execute Button"
+	"CRITICAL FIX: Point this to doIt, NOT inspectIt!"
 	btnExecute := self newButton
 		label: 'Execute in GemStone (Cmd+G)';
 		icon: ( self iconNamed: #glamorousPlay );
-		action: [ self inspectIt ].
+		action: [ self doIt ].
 		
-	"4. Setup the New Transaction Buttons"
-	btnCommit := self newButton.
-	btnCommit label: 'Commit'; icon: (self iconNamed: #smallSave); action: [ self doCommit ].
-	
-	btnAbort := self newButton.
-	btnAbort label: 'Abort (Sync)'; icon: (self iconNamed: #smallCancel); action: [ self doAbort ].
+	btnCommit := self newButton label: 'Commit'; icon: (self iconNamed: #smallSave); action: [ self doCommit ].
+	btnAbort := self newButton label: 'Abort (Sync)'; icon: (self iconNamed: #smallCancel); action: [ self doAbort ].
 ]
 
 { #category : 'initialization' }
