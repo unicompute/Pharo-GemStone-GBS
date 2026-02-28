@@ -26,30 +26,31 @@ Class {
 GbsLauncher >> connectPresenters [
 	btnLogin action: [ self doLogin ].
 	btnLogout action: [ self doLogout ].
-	
 	btnCommit action: [ self doCommit ].
 	btnAbort action: [ self doAbort ].
-	
 	btnWorkspace action: [ GbsWorkspace new open ].
 	btnBrowser action: [ GbsBrowser new open ].
 	btnTranscript action: [ | t | t := GbsRemoteTranscript new. t open. t startPolling. ].
 	btnUsers action: [ GbsUserListPresenter new open ].
-	btnPolling action: [ self togglePollingPreference ].
+	btnPolling action: [ self togglePollingPreference ]
 ]
 
 { #category : 'layout' }
 GbsLauncher >> defaultLayout [
 	^ SpBoxLayout newVertical spacing: 5;
-		add: (SpGridLayout new beColumnNotHomogeneous;
-			add: 'Stone:' at: 1@1; add: inputStone at: 2@1;
-			add: 'User:' at: 1@2; add: inputUser at: 2@2;
-			add: 'Pass:' at: 1@3; add: inputPass at: 2@3;
-			add: 'Lib:' at: 1@4; add: inputLibPath at: 2@4; yourself) expand: false;
-		add: (SpBoxLayout newHorizontal spacing: 5; add: btnLogin; add: btnLogout; yourself) expand: false;
-		add: (SpBoxLayout newHorizontal spacing: 5; add: btnCommit; add: btnAbort; yourself) expand: false; "<-- Added Trans Buttons!"
-		add: (SpBoxLayout newVertical spacing: 5; add: btnWorkspace; add: btnBrowser; add: btnTranscript; add: btnUsers; yourself) expand: false;
-		add: btnPolling expand: false;
-		add: statusLabel expand: false;
+		add: (SpGridLayout new
+			add: 'Stone:' atPoint: 1@1; add: inputStone atPoint: 2@1;
+			add: 'User:' atPoint: 1@2; add: inputUser atPoint: 2@2;
+			add: 'Pass:' atPoint: 1@3; add: inputPass atPoint: 2@3;
+			add: 'Lib:' atPoint: 1@4; add: inputLibPath atPoint: 2@4 span: 3@1;
+			yourself) height: 130;
+		add: (SpBoxLayout newHorizontal add: btnLogin; add: btnLogout; yourself) height: 30;
+		add: (SpBoxLayout newHorizontal add: btnCommit; add: btnAbort; yourself) height: 30;
+		add: (SpBoxLayout newVertical
+			add: 'Tools' asPresenter;
+			add: btnWorkspace; add: btnBrowser; add: btnTranscript; add: btnUsers; add: btnPolling;
+			yourself);
+		add: statusLabel;
 		yourself
 ]
 
@@ -127,23 +128,27 @@ GbsLauncher >> doLogout [
 
 { #category : 'initialization' }
 GbsLauncher >> initializePresenters [
-	"Keep your existing input fields..."
+	"1. Login Parameters (with your Mac path preserved)"
 	inputStone := self newTextInput text: 'gs64stone'.
 	inputUser := self newTextInput text: 'DataCurator'.
 	inputPass := self newTextInput text: 'swordfish'; bePassword.
-	inputLibPath := self newTextInput text: '/opt/gemstone/product/lib/libgcilnk64.so'.
+	inputLibPath := self newTextInput 
+		text: '/Users/tariq/GemStone64Bit3.7.4.3-arm64.Darwin/lib/libgcirpc-3.7.4.3-64.dylib';
+		placeholder: 'Path to libgcirpc.dylib'.
 
+	"2. Login Buttons"
 	btnLogin := self newButton label: 'Login'; icon: (self iconNamed: #smallOk).
 	btnLogout := self newButton label: 'Logout'; icon: (self iconNamed: #smallCancel).
 	
+	"3. Transaction Buttons"
 	btnCommit := self newButton label: 'Commit'; icon: (self iconNamed: #smallSave).
 	btnAbort := self newButton label: 'Abort'; icon: (self iconNamed: #smallCancel).
 
+	"4. Tools"
 	btnWorkspace := self newButton label: 'Workspace'; icon: (self iconNamed: #smallWindow).
 	btnBrowser := self newButton label: 'Browser'; icon: (self iconNamed: #smallSystemBrowser).
 	btnTranscript := self newButton label: 'Transcript'; icon: (self iconNamed: #transcript).
 	btnUsers := self newButton label: 'Users'; icon: (self iconNamed: #user).
-
 	btnPolling := self newButton label: 'Toggle Polling'.
 	statusLabel := self newLabel label: 'Status: Disconnected'.
 
@@ -192,31 +197,23 @@ GbsLauncher >> updatePollingLabel [
 
 { #category : 'updating' }
 GbsLauncher >> updateUIState [
-    | activeSession |
-    "Check if our Simple Launcher Session is active globally"
-    activeSession := GbsSessionParameters allSessions
-        detect: [ :each | each name = 'Simple Launcher Session' ]
-        ifNone: [ nil ].
-        
-    self updatePollingLabel.
-    
-    activeSession ifNotNil: [
-        "We are logged in: Disable login, enable tools"
-        statusLabel label: 'Status: Connected to ', activeSession gemStoneName.
-        btnLogin disable.
-        inputStone disable. inputUser disable. inputPass disable. inputLibPath disable.
-        btnLogout enable.
-        
-        btnWorkspace enable. btnBrowser enable. btnTranscript enable. 
-        btnUsers ifNotNil: [ btnUsers enable ]. "<-- NIL GUARD ADDED"
-    ] ifNil: [
-        "We are disconnected: Enable login, disable tools"
-        statusLabel label: 'Status: Disconnected'.
-        btnLogin enable.
-        inputStone enable. inputUser enable. inputPass enable. inputLibPath enable.
-        btnLogout disable.
-        
-        btnWorkspace disable. btnBrowser disable. btnTranscript disable. 
-        btnUsers ifNotNil: [ btnUsers disable ]. "<-- NIL GUARD ADDED"
-    ].
+	| activeSession |
+	activeSession := GbsSessionParameters allSessions detect: [ :each | each name = 'Simple Launcher Session' ] ifNone: [ nil ].
+	self updatePollingLabel.
+
+	activeSession ifNotNil: [
+		statusLabel label: 'Status: Connected to ', activeSession gemStoneName.
+		btnLogin disable.
+		inputStone disable. inputUser disable. inputPass disable. inputLibPath disable.
+		btnLogout enable. btnCommit enable. btnAbort enable.
+		btnWorkspace enable. btnBrowser enable. btnTranscript enable.
+		btnUsers ifNotNil: [ btnUsers enable ].
+	] ifNil: [
+		statusLabel label: 'Status: Disconnected'.
+		btnLogin enable.
+		inputStone enable. inputUser enable. inputPass enable. inputLibPath enable.
+		btnLogout disable. btnCommit disable. btnAbort disable.
+		btnWorkspace disable. btnBrowser disable. btnTranscript disable.
+		btnUsers ifNotNil: [ btnUsers disable ].
+	].
 ]
