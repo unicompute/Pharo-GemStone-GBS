@@ -105,7 +105,9 @@ GbsRemoteTranscript class >> installTransientProxy [
 { #category : 'logic' }
 GbsRemoteTranscript >> appendLog: aString [
 	UIManager default defer: [
-		textPresenter text: (textPresenter text asString, aString, String cr).
+		| current |
+		current := textPresenter text ifNil: [ '' ].
+		textPresenter text: current asString, aString, String cr.
 	].
 ]
 
@@ -127,7 +129,7 @@ GbsRemoteTranscript >> fetchNewEntries [
 	| activeSession logEntries safeScript |
 	activeSession := GbsSessionParameters currentSession.
 	
-	"CRITICAL: GBS is non-reentrant. If the session is busy, abort this poll immediately."
+	"STRICT GUARD: Do not allow a poll if GemStone is currently processing code"
 	(activeSession isNil or: [ activeSession isBusy ]) ifTrue: [ ^ self ].
 	
 	safeScript := '
@@ -143,8 +145,8 @@ GbsRemoteTranscript >> fetchNewEntries [
 		logEntries ifNotNil: [ 
 			logEntries do: [ :each | self appendLog: each asString ] ].
 	] on: Error do: [ :ex | 
-		"Log to terminal instead of UI to avoid recursive error loops"
-		NonInteractiveTranscript stdout nextPutAll: 'GBS Poll Collision: ', ex description; cr.
+		"Log errors to the local terminal, not a pop-up window"
+		NonInteractiveTranscript stdout nextPutAll: 'GCI Collision Avoided: ', ex description; cr.
 	].
 ]
 

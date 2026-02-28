@@ -42,21 +42,19 @@ GbsWorkspace >> doCommit [
 	]
 ]
 
-{ #category : 'do-its' }
+{ #category : 'actions' }
 GbsWorkspace >> doIt [
 	| code activeSession |
 	code := self selectedCodeOrAll.
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'No Session' ].
 	
-	"Move execution to a background process to keep the UI thread responsive"
+	"Move GemStone work to a background thread to prevent UI Deadlocks"
 	[ 
-		| result |
 		[
-			"1. Perform the heavy FFI call"
-			result := activeSession evaluate: code asString.
+			activeSession evaluate: code asString.
 			
-			"2. Once the call is 100% finished, schedule the UI update"
+			"Only update UI after the network call is 100% finished"
 			UIManager default defer: [
 				GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
 			].
