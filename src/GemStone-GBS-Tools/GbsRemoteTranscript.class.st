@@ -11,7 +11,7 @@ Class {
 
 { #category : 'setup' }
 GbsRemoteTranscript class >> installForwarder [
-  "Connect Pharo's system Transcript to our custom Spec2 window"
+  "Connect Pharo's system Transcript to our custom window"
 
   "GbsRemoteTranscript installForwarder."
 
@@ -104,7 +104,7 @@ GbsRemoteTranscript class >> installTransientProxy [
 
 { #category : 'updating' }
 GbsRemoteTranscript >> appendLog: aString [
-	"Safely update the UI from the background network thread"
+	"Thread-safe update for Spec2"
 	UIManager default defer: [
 		| currentText |
 		currentText := textPresenter text asString.
