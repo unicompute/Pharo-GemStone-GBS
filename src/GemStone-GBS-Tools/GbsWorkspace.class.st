@@ -63,6 +63,28 @@ GbsWorkspace >> executeInGemStone [
 ]
 
 { #category : 'actions' }
+GbsWorkspace >> gemStoneDebugIt [
+	| text activeSession |
+	text := textEditor selectedText.
+	text isEmpty ifTrue: [ text := textEditor text ].
+	
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
+	
+	[ 
+		"Execute safely on the main thread"
+		activeSession evaluate: text asString.
+		self inform: 'GemStone: Executed (No errors to debug)'.
+		
+	] on: Error do: [ :ex | 
+		"If GemStone throws a server error, let it pass so your GbsRemoteDebugger can catch it"
+		(ex class name = #GbsError or: [ ex isKindOf: Error ])
+			ifTrue: [ ex pass ]
+			ifFalse: [ self inform: 'Local Error caught: ', ex messageText ]
+	].
+]
+
+{ #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
 	| text activeSession script result |
 	text := textEditor selectedText.
