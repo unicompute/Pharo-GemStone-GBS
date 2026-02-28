@@ -74,7 +74,7 @@ GbsRemoteTranscript >> fetchNewEntries [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self ].
 	
-	"1. Fetch the data, catching ANY errors so the Debugger never pops up!"
+	"Because this is now safely on the main thread, we wrap everything in an error block"
 	[
 		logText := activeSession evaluate: '
 			| log |
@@ -83,13 +83,9 @@ GbsRemoteTranscript >> fetchNewEntries [
 				log do: [ :each | stream nextPutAll: each asString; nextPut: Character lf ]
 			]
 		'.
+		textPresenter ifNotNil: [ textPresenter text: logText asString ].
 	] on: Error do: [ :ex | 
-		logText := '--- Paused: Error or network timeout fetching log ---' 
-	].
-	
-	"2. Safely push ONLY the text update to the UI thread"
-	UIManager default defer: [
-		textPresenter ifNotNil: [ textPresenter text: logText asString ]
+		textPresenter ifNotNil: [ textPresenter text: '--- Polling: Waiting for server response ---' ].
 	].
 ]
 
@@ -115,8 +111,8 @@ GbsRemoteTranscript >> startPolling [
 		(Delay forMilliseconds: 500) wait.
 		
 		[ self window isNotNil and: [ self window isOpen ] ] whileTrue: [
-			"Call the fetcher from the background thread"
-			self fetchNewEntries.
+			"Force BOTH the FFI call and the UI update onto the Main Thread!"
+			UIManager default defer: [ self fetchNewEntries ].
 			(Delay forSeconds: 2) wait.
 		]
 	] fork.
