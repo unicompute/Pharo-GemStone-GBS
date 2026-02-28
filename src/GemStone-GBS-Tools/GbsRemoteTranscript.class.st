@@ -83,18 +83,17 @@ GbsRemoteTranscript >> fetchNewEntries [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self ].
 	
-	"Because this is now safely on the main thread, we wrap everything in an error block"
 	[
 		logText := activeSession evaluate: '
 			| log |
 			log := SessionTemps current at: #RemoteTranscript ifAbsentPut: [ OrderedCollection new ].
 			String streamContents: [ :stream |
-				log do: [ :each | stream nextPutAll: each asString; nextPut: Character lf ]
+				log do: [ :each | stream nextPutAll: each asString; lf ]
 			]
 		'.
-		textPresenter ifNotNil: [ textPresenter text: logText asString ].
+		textPresenter text: logText asString.
 	] on: Error do: [ :ex | 
-		textPresenter ifNotNil: [ textPresenter text: '--- Polling: Waiting for server response ---' ].
+		textPresenter text: '--- Error fetching log: ', ex messageText, ' ---'.
 	].
 ]
 
@@ -105,16 +104,18 @@ GbsRemoteTranscript >> initializePresenters [
 	btnRefresh := self newButton.
 	btnRefresh label: 'Refresh Log'; icon: (self iconNamed: #glamorousRefresh).
 	
-	"Fetch once safely when the window opens"
-	self fetchNewEntries.
+	"CRITICAL FIX: Do NOT call fetchNewEntries here while the UI is building!"
 ]
 
 { #category : 'initialization' }
 GbsRemoteTranscript >> initializeWindow: aWindowPresenter [
 	aWindowPresenter 
 		title: 'GemStone Remote Transcript';
-		initialExtent: 600@400.
-	"Removed the whenClosedDo: stopPolling hook entirely"
+		initialExtent: 600@400;
+		whenOpenedDo: [ 
+			"Wait until the window is fully drawn on screen before talking to the network!"
+			UIManager default defer: [ self fetchNewEntries ] 
+		].
 ]
 
 { #category : 'polling' }
