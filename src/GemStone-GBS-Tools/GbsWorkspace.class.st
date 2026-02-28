@@ -44,16 +44,19 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-	| text activeSession |
-	text := textEditor selectedText.
-	text isEmpty ifTrue: [ text := textEditor text ].
+	| code activeSession |
+	
+	code := self selectedCodeOrAll.
+	code ifEmpty: [ ^ self ].
 	
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	"CRITICAL FIX: Execute strictly on the main thread. NO FORK!"
-	activeSession evaluate: text asString.
-	self inform: 'GemStone: Execution Complete'.
+	"Defer execution by 1 frame so the context menu can safely close first!"
+	UIManager default defer: [
+		activeSession evaluate: code asString.
+		self inform: 'GemStone: Execution Complete'.
+	].
 ]
 
 { #category : 'actions' }
@@ -86,23 +89,22 @@ GbsWorkspace >> gemStoneDebugIt [
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| code activeSession script result |
+	| code activeSession script |
 	
-	"Use your existing helper to grab the text"
 	code := self selectedCodeOrAll. 
 	code ifEmpty: [ ^ self ].
 	
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	"Wrap the code to ensure GemStone returns a String"
 	script := '( ', code asString, ' ) printString'.
 	
-	"1. Execute safely on the main thread"
-	result := activeSession evaluate: script.
-	
-	"2. Insert the result directly into the Workspace text!"
-	self insertResult: result asString.
+	"Defer execution by 1 frame so the context menu can safely close first!"
+	UIManager default defer: [
+		| result |
+		result := activeSession evaluate: script.
+		self insertResult: result asString.
+	].
 ]
 
 { #category : 'initialization' }
