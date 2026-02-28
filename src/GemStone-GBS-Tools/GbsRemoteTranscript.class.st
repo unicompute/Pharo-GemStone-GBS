@@ -9,6 +9,17 @@ Class {
 	#package : 'GemStone-GBS-Tools'
 }
 
+{ #category : 'setup' }
+GbsRemoteTranscript class >> installForwarder [
+	"Run this once to link Pharo's Transcript to this window"
+	Transcript announcer 
+		when: StringSignal 
+		do: [ :signal | 
+			self allInstancesDo: [ :win | win appendLog: signal message ] 
+		]
+		for: self.
+]
+
 { #category : 'gemstone integration' }
 GbsRemoteTranscript class >> installGemStoneProxy [
 

@@ -44,29 +44,15 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-	| code activeSession originalTranscript |
+	| code activeSession |
 	code := self selectedCodeOrAll.
 	code ifEmpty: [ ^ self ].
 	
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
 	
-	"Defer to prevent the Morphic Menu Deadlock!"
 	UIManager default defer: [ 
-		originalTranscript := Smalltalk globals at: #Transcript.
-		
-		[ 
-			"1. Temporarily hijack Pharo's Transcript to point to our custom class"
-			Smalltalk globals at: #Transcript put: GbsRemoteTranscript.
-			
-			"2. Execute the user's code safely"
-			activeSession evaluate: code asString.
-			
-		] ensure: [ 
-			"3. ALWAYS restore the real Pharo Transcript when finished!"
-			Smalltalk globals at: #Transcript put: originalTranscript.
-		].
-		
+		activeSession evaluate: code asString.
 		self inform: 'GemStone: Execution Complete'.
 	].
 ]
