@@ -104,11 +104,10 @@ GbsRemoteTranscript class >> installTransientProxy [
 
 { #category : 'logic' }
 GbsRemoteTranscript >> appendLog: aString [
-	"Thread-safe UI update"
 	UIManager default defer: [
-		| currentText |
-		currentText := textPresenter text ifNil: [ '' ].
-		textPresenter text: currentText asString, aString, String cr.
+		| current |
+		current := textPresenter text ifNil: [ '' ].
+		textPresenter text: current asString, aString, String cr.
 	].
 ]
 
@@ -127,11 +126,10 @@ GbsRemoteTranscript >> defaultLayout [
 
 { #category : 'actions' }
 GbsRemoteTranscript >> fetchNewEntries [
-	| activeSession logText safeScript |
+	| activeSession logEntries safeScript |
 	activeSession := GbsSessionParameters currentSession.
 	
-	"1. Avoid FFI Re-entrancy: If GemStone is busy with your Workspace code, 
-	   don't start a second network call yet."
+	"Safety Guard: Don't poll if the session is currently tied up"
 	(activeSession isNil or: [ activeSession isBusy ]) ifTrue: [ ^ self ].
 	
 	safeScript := '
@@ -143,18 +141,11 @@ GbsRemoteTranscript >> fetchNewEntries [
 	'.
 	
 	[
-		logText := activeSession evaluate: safeScript.
-		"2. Process the results"
-		logText ifNotNil: [ 
-			logText do: [ :each | self appendLog: each asString ] ].
-			
+		logEntries := activeSession evaluate: safeScript.
+		logEntries do: [ :each | self appendLog: each asString ].
 	] on: Error do: [ :ex | 
-		"3. SMART ERROR HANDLING: 
-		   Instead of an empty block, log to the local OS terminal/Transcript.
-		   This allows you to debug the connection without freezing Pharo."
-		NonInteractiveTranscript stdout 
-			nextPutAll: 'GBS Poll Link: ';
-			nextPutAll: ex description; cr.
+		"Log to local terminal only to prevent UI recursive loops"
+		NonInteractiveTranscript stdout nextPutAll: 'Poll skipped: ', ex description; cr.
 	].
 ]
 

@@ -49,16 +49,16 @@ GbsWorkspace >> doIt [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'No Session' ].
 	
-	"CRITICAL: Fork the process to keep the UI thread alive and prevent FFI crashes"
+	"OFFLOAD FROM UI THREAD: Forking prevents the UI from deadlocking during the network call"
 	[ 
 		[ 
-			"1. Execute the code on a background thread"
+			"1. Execute the code"
 			activeSession evaluate: code asString.
 			
-			"2. Give the network a tiny moment to settle"
+			"2. Wait for the bridge to idle"
 			(Delay forMilliseconds: 50) wait.
 			
-			"3. Tell the Transcript to fetch the result"
+			"3. Tell the Transcript to fetch results SAFELY"
 			UIManager default defer: [
 				GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
 			].
