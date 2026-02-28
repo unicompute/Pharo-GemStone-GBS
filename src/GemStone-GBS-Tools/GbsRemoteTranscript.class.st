@@ -67,6 +67,26 @@ GbsRemoteTranscript >> fetchLogs [
     ].
 ]
 
+{ #category : 'polling' }
+GbsRemoteTranscript >> fetchNewEntries [
+	| activeSession logText |
+	
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self ].
+	
+	"1. Fetch the remote log from GemStone's temporary session memory"
+	logText := activeSession evaluate: '
+		| log |
+		log := SessionTemps current at: #RemoteTranscript ifAbsentPut: [ OrderedCollection new ].
+		String streamContents: [ :stream |
+			log do: [ :each | stream nextPutAll: each asString; lf ]
+		]
+	'.
+	
+	"2. Safely update the text pane using the correct variable name!"
+	textPresenter text: logText asString.
+]
+
 { #category : 'initialization' }
 GbsRemoteTranscript >> initializePresenters [
     textPresenter := self newText.
@@ -75,26 +95,36 @@ GbsRemoteTranscript >> initializePresenters [
 
 { #category : 'initialization' }
 GbsRemoteTranscript >> initializeWindow: aWindowPresenter [
-    aWindowPresenter 
-        title: 'GemStone Remote Transcript';
-        initialExtent: 500@300;
-        whenClosedDo: [ self stopPolling ].
+	aWindowPresenter 
+		title: 'GemStone Remote Transcript';
+		initialExtent: 600@400;
+		whenClosedDo: [ self stopPolling ].
 ]
 
-{ #category : 'logic' }
+{ #category : 'polling' }
 GbsRemoteTranscript >> startPolling [
-    pollingProcess ifNotNil: [ pollingProcess terminate ].
-    pollingProcess := [ 
-        [ self window isNotNil and: [ self window isOpen ] ] whileTrue: [ 
-            self fetchLogs.
-            (Delay forSeconds: 2) wait.
-        ] 
-    ] fork.
+	pollingProcess ifNotNil: [ pollingProcess terminate ].
+	
+	pollingProcess := [
+		"1. Give the window half a second to actually build and open"
+		(Delay forMilliseconds: 500) wait.
+		
+		[ self window isNotNil and: [ self window isOpen ] ] whileTrue: [
+			"2. Safely marshal the FFI call and UI update onto the Main UI Thread"
+			UIManager default defer: [ 
+				self fetchNewEntries 
+			].
+			
+			"3. Wait 2 seconds before asking again"
+			(Delay forSeconds: 2) wait.
+		]
+	] fork.
 ]
 
 { #category : 'logic' }
-GbsRemoteTranscript >> stopPolling [ 
-    pollingProcess ifNotNil: [ pollingProcess terminate ].
-    pollingProcess := nil.
-
+GbsRemoteTranscript >> stopPolling [
+	pollingProcess ifNotNil: [ 
+		pollingProcess terminate.
+		pollingProcess := nil.
+	].
 ]
