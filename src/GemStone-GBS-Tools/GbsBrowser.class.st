@@ -104,7 +104,14 @@ GbsBrowser >> initializePresenters [
 
 { #category : 'initialization' }
 GbsBrowser >> initializeWindow: aWindowPresenter [
-    aWindowPresenter title: 'GemStone System Browser'; initialExtent: 800@600.
+	aWindowPresenter 
+		title: 'GemStone Browser';
+		initialExtent: 800@600.
+		
+	"Wait until the UI thread finishes drawing the window, THEN fetch the classes"
+	aWindowPresenter whenOpenedDo: [ 
+		UIManager default defer: [ self loadClasses ]
+	].
 ]
 
 { #category : 'data fetching' }
@@ -118,6 +125,32 @@ GbsBrowser >> loadClassList [
         stream contents
     '.
     classList items: allNamesString lines.
+]
+
+{ #category : 'updating' }
+GbsBrowser >> loadClasses [
+	| session script classNames |
+	session := GbsSessionParameters currentSession.
+	session ifNil: [ ^ self inform: 'Cannot load classes: Not connected to GemStone!' ].
+
+	"1. The raw GemStone script to find all classes in your primary dictionary"
+	script := '
+		| dict names |
+		dict := System myUserProfile symbolList first.
+		names := Array new.
+		dict keysAndValuesDo: [ :key :value |
+			(value isKindOf: Class) ifTrue: [ names add: key asString ].
+		].
+		names
+	'.
+
+	"2. Execute safely over FFI"
+	classNames := session evaluate: script.
+
+	"3. Update your UI list, sorted alphabetically"
+	(classNames isKindOf: Array) ifTrue: [ 
+		classList items: classNames asSortedCollection.
+	].
 ]
 
 { #category : 'data fetching' }
