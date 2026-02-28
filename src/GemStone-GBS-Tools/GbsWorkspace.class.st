@@ -44,37 +44,31 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-
-  | code activeSession |
-  code := self selectedCodeOrAll.
-  code ifEmpty: [ ^ self ].
-
-  activeSession := GbsSessionParameters currentSession.
-  activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
-
-  "Defer to prevent the Morphic Menu Deadlock!"
-  UIManager default defer: [
-      | fetchScript logs |
-      "1. Execute the user's code safely"
-      activeSession evaluate: code asString.
-
-      "2. Fetch the caught logs and clear the server's cache"
-      fetchScript := '
-			| log copy |
-			log := SessionTemps current at: #PharoTranscriptLog ifAbsent: [ OrderedCollection new ].
-			copy := log copy.
-			log removeAll.
-			copy asArray
-		'.
-      logs := activeSession evaluate: fetchScript.
-
-      "3. Push the logs directly into our custom VW-ported Remote Transcript window!"
-      ( logs isKindOf: Array ) ifTrue: [
-        logs do: [ :each |
-          GbsRemoteTranscript allInstancesDo: [ :win | win appendLog: each asString ] ] ].
-
-      self inform: 'GemStone: Execution Complete'
-      ]
+	| code activeSession originalTranscript |
+	code := self selectedCodeOrAll.
+	code ifEmpty: [ ^ self ].
+	
+	activeSession := GbsSessionParameters currentSession.
+	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
+	
+	"Defer to prevent the Morphic Menu Deadlock!"
+	UIManager default defer: [ 
+		originalTranscript := Smalltalk globals at: #Transcript.
+		
+		[ 
+			"1. Temporarily hijack Pharo's Transcript to point to our custom class"
+			Smalltalk globals at: #Transcript put: GbsRemoteTranscript.
+			
+			"2. Execute the user's code safely"
+			activeSession evaluate: code asString.
+			
+		] ensure: [ 
+			"3. ALWAYS restore the real Pharo Transcript when finished!"
+			Smalltalk globals at: #Transcript put: originalTranscript.
+		].
+		
+		self inform: 'GemStone: Execution Complete'.
+	].
 ]
 
 { #category : 'actions' }

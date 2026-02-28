@@ -100,12 +100,22 @@ GbsRemoteTranscript >> appendLog: aString [
 	].
 ]
 
+{ #category : 'logging' }
+GbsRemoteTranscript >> cr [
+	"Safely ignore! Our appendLog: method already adds a carriage return automatically."
+]
+
 { #category : 'layout' }
 GbsRemoteTranscript >> defaultLayout [
 	^ SpBoxLayout newVertical
 		add: btnClear expand: false fill: false padding: 2;
 		add: textPresenter;
 		yourself
+]
+
+{ #category : 'logging' }
+GbsRemoteTranscript >> flush [
+	"Sometimes called by outcalls. Safely ignore."
 ]
 
 { #category : 'initialization' }
@@ -128,6 +138,16 @@ GbsRemoteTranscript >> initializeWindow: aWindowPresenter [
 { #category : 'initialization' }
 GbsRemoteTranscript >> installGemStoneProxy [
 	^ self class installGemStoneProxy
+]
+
+{ #category : 'logging' }
+GbsRemoteTranscript >> show: aString [
+	"Catch the GemStone outcall and push it to the UI thread"
+	UIManager default defer: [
+		self class allInstancesDo: [ :win | 
+			win appendLog: aString asString 
+		]
+	].
 ]
 
 { #category : 'initialization' }
