@@ -74,17 +74,23 @@ GbsRemoteTranscript >> fetchNewEntries [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self ].
 	
-	"1. Fetch the remote log from GemStone's temporary session memory"
-	logText := activeSession evaluate: '
-		| log |
-		log := SessionTemps current at: #RemoteTranscript ifAbsentPut: [ OrderedCollection new ].
-		String streamContents: [ :stream |
-			log do: [ :each | stream nextPutAll: each asString; lf ]
-		]
-	'.
+	"1. Fetch the data, catching ANY errors so the Debugger never pops up!"
+	[
+		logText := activeSession evaluate: '
+			| log |
+			log := SessionTemps current at: #RemoteTranscript ifAbsentPut: [ OrderedCollection new ].
+			String streamContents: [ :stream |
+				log do: [ :each | stream nextPutAll: each asString; nextPut: Character lf ]
+			]
+		'.
+	] on: Error do: [ :ex | 
+		logText := '--- Paused: Error or network timeout fetching log ---' 
+	].
 	
-	"2. Safely update the text pane using the correct variable name!"
-	textPresenter text: logText asString.
+	"2. Safely push ONLY the text update to the UI thread"
+	UIManager default defer: [
+		textPresenter ifNotNil: [ textPresenter text: logText asString ]
+	].
 ]
 
 { #category : 'initialization' }
@@ -106,16 +112,11 @@ GbsRemoteTranscript >> startPolling [
 	pollingProcess ifNotNil: [ pollingProcess terminate ].
 	
 	pollingProcess := [
-		"1. Give the window half a second to actually build and open"
 		(Delay forMilliseconds: 500) wait.
 		
 		[ self window isNotNil and: [ self window isOpen ] ] whileTrue: [
-			"2. Safely marshal the FFI call and UI update onto the Main UI Thread"
-			UIManager default defer: [ 
-				self fetchNewEntries 
-			].
-			
-			"3. Wait 2 seconds before asking again"
+			"Call the fetcher from the background thread"
+			self fetchNewEntries.
 			(Delay forSeconds: 2) wait.
 		]
 	] fork.
