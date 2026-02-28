@@ -44,19 +44,24 @@ GbsWorkspace >> doCommit [
 
 { #category : 'actions' }
 GbsWorkspace >> doIt [
-	| code activeSession |
-	
+	| code |
 	code := self selectedCodeOrAll.
 	code ifEmpty: [ ^ self ].
 	
-	activeSession := GbsSessionParameters currentSession.
-	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
-	
-	"Defer execution by 1 frame so the context menu can safely close first!"
-	UIManager default defer: [
-		activeSession evaluate: code asString.
-		self inform: 'GemStone: Execution Complete'.
-	].
+	"1. Jump to a background thread just to wait 50ms so the menu can close!"
+	[ 
+		(Delay forMilliseconds: 50) wait.
+		
+		"2. Safely jump BACK to the Main Thread to do the FFI network call!"
+		UIManager default defer: [ 
+			| activeSession |
+			activeSession := GbsSessionParameters currentSession.
+			activeSession ifNotNil: [ 
+				activeSession evaluate: code asString.
+				self inform: 'GemStone: Execution Complete'.
+			] ifNil: [ self inform: 'Not connected to GemStone!' ].
+		].
+	] fork.
 ]
 
 { #category : 'actions' }
@@ -89,22 +94,26 @@ GbsWorkspace >> gemStoneDebugIt [
 
 { #category : 'actions' }
 GbsWorkspace >> gemStonePrintIt [
-	| code activeSession script |
-	
+	| code script |
 	code := self selectedCodeOrAll. 
 	code ifEmpty: [ ^ self ].
 	
-	activeSession := GbsSessionParameters currentSession.
-	activeSession ifNil: [ ^ self inform: 'Not connected to GemStone!' ].
-	
 	script := '( ', code asString, ' ) printString'.
 	
-	"Defer execution by 1 frame so the context menu can safely close first!"
-	UIManager default defer: [
-		| result |
-		result := activeSession evaluate: script.
-		self insertResult: result asString.
-	].
+	"1. Jump to a background thread just to wait 50ms so the menu can close!"
+	[ 
+		(Delay forMilliseconds: 50) wait.
+		
+		"2. Safely jump BACK to the Main Thread to do the FFI network call!"
+		UIManager default defer: [ 
+			| activeSession result |
+			activeSession := GbsSessionParameters currentSession.
+			activeSession ifNotNil: [ 
+				result := activeSession evaluate: script.
+				self insertResult: result asString.
+			] ifNil: [ self inform: 'Not connected to GemStone!' ].
+		].
+	] fork.
 ]
 
 { #category : 'initialization' }
