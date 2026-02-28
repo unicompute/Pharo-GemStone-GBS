@@ -11,13 +11,13 @@ Class {
 
 { #category : 'setup' }
 GbsRemoteTranscript class >> installForwarder [
-	"Run this once to link Pharo's Transcript to this window"
+	"Connect Pharo's system Transcript to our custom Spec2 window"
 	Transcript announcer 
 		when: StringSignal 
 		do: [ :signal | 
 			self allInstancesDo: [ :win | win appendLog: signal message ] 
 		]
-		for: self.
+		for: self
 ]
 
 { #category : 'gemstone integration' }
@@ -103,11 +103,11 @@ GbsRemoteTranscript class >> installTransientProxy [
 
 { #category : 'updating' }
 GbsRemoteTranscript >> appendLog: aString [
-	"Ported VW Pattern: Push the UI update onto the safe UIManager queue"
+	"Safely update the UI from the background network thread"
 	UIManager default defer: [
 		| currentText |
 		currentText := textPresenter text asString.
-		textPresenter text: currentText, aString, Character cr asString.
+		textPresenter text: currentText, aString.
 	].
 ]
 
