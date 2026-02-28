@@ -30,9 +30,12 @@ GbsLauncher >> connectPresenters [
 	btnAbort action: [ self doAbort ].
 	btnWorkspace action: [ GbsWorkspace new open ].
 	btnBrowser action: [ GbsBrowser new open ].
-	btnTranscript action: [ | t | t := GbsRemoteTranscript new. t open. t startPolling. ].
+	
+	"SAFE FIX: Just open the window, no more polling!"
+	btnTranscript action: [ GbsRemoteTranscript new open ].
+	
 	btnUsers action: [ GbsUserListPresenter new open ].
-	btnPolling action: [ self togglePollingPreference ]
+	btnPolling action: [ self togglePollingPreference ].
 ]
 
 { #category : 'layout' }

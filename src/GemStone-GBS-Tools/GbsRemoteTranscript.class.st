@@ -3,6 +3,7 @@ Class {
 	#superclass : 'SpPresenter',
 	#instVars : [
 		'textPresenter',
+		'btnRefresh',
 		'pollingProcess'
 	],
 	#category : 'GemStone-GBS-Tools',
@@ -35,9 +36,17 @@ GbsRemoteTranscript >> appendText: aString [
     textPresenter text: currentText asString, aString, String cr.
 ]
 
+{ #category : 'initialization' }
+GbsRemoteTranscript >> connectPresenters [
+	btnRefresh action: [ self fetchNewEntries ].
+]
+
 { #category : 'layout' }
 GbsRemoteTranscript >> defaultLayout [
-    ^ SpBoxLayout newVertical add: textPresenter; yourself
+	^ SpBoxLayout newVertical
+		add: btnRefresh expand: false fill: false padding: 5;
+		add: textPresenter;
+		yourself
 ]
 
 { #category : 'logic' }
@@ -91,16 +100,21 @@ GbsRemoteTranscript >> fetchNewEntries [
 
 { #category : 'initialization' }
 GbsRemoteTranscript >> initializePresenters [
-    textPresenter := self newText.
-    textPresenter beNotEditable.
+	textPresenter := self newText.
+	
+	btnRefresh := self newButton.
+	btnRefresh label: 'Refresh Log'; icon: (self iconNamed: #glamorousRefresh).
+	
+	"Fetch once safely when the window opens"
+	self fetchNewEntries.
 ]
 
 { #category : 'initialization' }
 GbsRemoteTranscript >> initializeWindow: aWindowPresenter [
 	aWindowPresenter 
 		title: 'GemStone Remote Transcript';
-		initialExtent: 600@400;
-		whenClosedDo: [ self stopPolling ].
+		initialExtent: 600@400.
+	"Removed the whenClosedDo: stopPolling hook entirely"
 ]
 
 { #category : 'polling' }
