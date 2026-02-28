@@ -3,8 +3,7 @@ Class {
 	#superclass : 'SpPresenter',
 	#instVars : [
 		'textPresenter',
-		'btnRefresh',
-		'pollingProcess'
+		'btnRefresh'
 	],
 	#category : 'GemStone-GBS-Tools',
 	#package : 'GemStone-GBS-Tools'
@@ -76,67 +75,48 @@ GbsRemoteTranscript >> fetchLogs [
     ].
 ]
 
-{ #category : 'polling' }
+{ #category : 'actions' }
 GbsRemoteTranscript >> fetchNewEntries [
-	| activeSession logText |
+	| activeSession logText safeScript |
+	
+	textPresenter text: 'Fetching from GemStone...'.
 	
 	activeSession := GbsSessionParameters currentSession.
-	activeSession ifNil: [ ^ self ].
+	activeSession ifNil: [ 
+		textPresenter text: '--- Not connected to a session ---'. 
+		^ self 
+	].
+	
+	safeScript := '
+		| log |
+		log := SessionTemps current at: #RemoteTranscript ifAbsent: [ nil ].
+		log ifNil: [ ^ ''--- No logs recorded yet ---'' ].
+		
+		String streamContents: [ :stream |
+			log do: [ :each | 
+				stream nextPutAll: each asString; nextPut: Character lf 
+			]
+		]
+	'.
 	
 	[
-		logText := activeSession evaluate: '
-			| log |
-			log := SessionTemps current at: #RemoteTranscript ifAbsentPut: [ OrderedCollection new ].
-			String streamContents: [ :stream |
-				log do: [ :each | stream nextPutAll: each asString; lf ]
-			]
-		'.
+		logText := activeSession evaluate: safeScript.
 		textPresenter text: logText asString.
 	] on: Error do: [ :ex | 
-		textPresenter text: '--- Error fetching log: ', ex messageText, ' ---'.
+		textPresenter text: '--- Safe Mode Caught Error: ', ex printString, ' ---'.
 	].
 ]
 
 { #category : 'initialization' }
 GbsRemoteTranscript >> initializePresenters [
 	textPresenter := self newText.
-	
 	btnRefresh := self newButton.
 	btnRefresh label: 'Refresh Log'; icon: (self iconNamed: #glamorousRefresh).
-	
-	"CRITICAL FIX: Do NOT call fetchNewEntries here while the UI is building!"
 ]
 
 { #category : 'initialization' }
 GbsRemoteTranscript >> initializeWindow: aWindowPresenter [
 	aWindowPresenter 
-		title: 'GemStone Remote Transcript';
-		initialExtent: 600@400;
-		whenOpenedDo: [ 
-			"Wait until the window is fully drawn on screen before talking to the network!"
-			UIManager default defer: [ self fetchNewEntries ] 
-		].
-]
-
-{ #category : 'polling' }
-GbsRemoteTranscript >> startPolling [
-	pollingProcess ifNotNil: [ pollingProcess terminate ].
-	
-	pollingProcess := [
-		(Delay forMilliseconds: 500) wait.
-		
-		[ self window isNotNil and: [ self window isOpen ] ] whileTrue: [
-			"Force BOTH the FFI call and the UI update onto the Main Thread!"
-			UIManager default defer: [ self fetchNewEntries ].
-			(Delay forSeconds: 2) wait.
-		]
-	] fork.
-]
-
-{ #category : 'logic' }
-GbsRemoteTranscript >> stopPolling [
-	pollingProcess ifNotNil: [ 
-		pollingProcess terminate.
-		pollingProcess := nil.
-	].
+		title: 'GemStone Remote Transcript (Safe Mode)';
+		initialExtent: 600@400.
 ]
