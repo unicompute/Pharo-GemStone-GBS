@@ -49,19 +49,13 @@ GbsWorkspace >> doIt [
 	activeSession := GbsSessionParameters currentSession.
 	activeSession ifNil: [ ^ self inform: 'No Session' ].
 	
-	"Move GemStone work to a background thread to prevent UI Deadlocks"
-	[ 
-		[
-			activeSession evaluate: code asString.
-			
-			"Only update UI after the network call is 100% finished"
-			UIManager default defer: [
-				GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
-			].
-		] on: Error do: [ :ex | 
-			UIManager default defer: [ self inform: 'GemStone Error: ', ex description ].
-		].
-	] forkAt: Processor userBackgroundPriority.
+	"1. Execute synchronously"
+	activeSession evaluate: code asString.
+	
+	"2. Safely trigger the fetch"
+	UIManager default defer: [
+		GbsRemoteTranscript allInstances do: [ :win | win fetchNewEntries ]
+	].
 ]
 
 { #category : 'actions' }

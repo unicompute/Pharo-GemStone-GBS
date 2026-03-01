@@ -107,7 +107,7 @@ GbsRemoteTranscript >> appendLog: aString [
 	UIManager default defer: [
 		| current |
 		current := textPresenter text ifNil: [ '' ].
-		textPresenter text: current asString, aString, String cr.
+		textPresenter text: current asString, aString.
 	].
 ]
 
@@ -126,27 +126,30 @@ GbsRemoteTranscript >> defaultLayout [
 
 { #category : 'actions' }
 GbsRemoteTranscript >> fetchNewEntries [
-	| activeSession logEntries safeScript |
+	| activeSession logText safeScript |
 	activeSession := GbsSessionParameters currentSession.
-	
-	"STRICT GUARD: Do not allow a poll if GemStone is currently processing code"
 	(activeSession isNil or: [ activeSession isBusy ]) ifTrue: [ ^ self ].
 	
+	"CRITICAL: Build ONE pure String on the server so no Proxies reach the Pharo UI"
 	safeScript := '
-		| log copy |
+		| log copy stream |
 		log := SessionTemps current at: #RemoteLog ifAbsent: [ #() ].
 		copy := log copy.
 		log removeAll.
-		copy asArray
+		
+		stream := WriteStream on: String new.
+		copy do: [ :each | stream nextPutAll: each asString; lf ].
+		stream contents
 	'.
 	
 	[
-		logEntries := activeSession evaluate: safeScript.
-		logEntries ifNotNil: [ 
-			logEntries do: [ :each | self appendLog: each asString ] ].
+		"Because it returns a single string, GBS translates it to a native Pharo ByteString!!"
+		logText := activeSession evaluate: safeScript.
+		(logText isNotNil and: [ logText isNotEmpty ]) ifTrue: [ 
+			self appendLog: logText asString 
+		].
 	] on: Error do: [ :ex | 
-		"Log errors to the local terminal, not a pop-up window"
-		NonInteractiveTranscript stdout nextPutAll: 'GCI Collision Avoided: ', ex description; cr.
+		NonInteractiveTranscript stdout nextPutAll: 'GBS Poll: ', ex description; cr.
 	].
 ]
 
